@@ -105,7 +105,8 @@ contract BaseSushiSwapVault is AbstractVault {
       SUSHISWAP_ROUTER_ADDRESS,
       tokenReturnedAmount
     );
-    WETH.withdraw(Math.mulDiv(amount, 1, 2));
+    uint256 ethAmount = Math.mulDiv(amount, 1, 2);
+    WETH.withdraw(ethAmount);
 
     // deadline means current time + 5 minutes;
     // solhint-disable-next-line not-rely-on-time
@@ -113,7 +114,7 @@ contract BaseSushiSwapVault is AbstractVault {
 
     // slither-disable-next-line unused-return
     (, , uint liquidity) = IUniswapV2Router01(SUSHISWAP_ROUTER_ADDRESS)
-      .addLiquidityETH{value: address(this).balance}(
+      .addLiquidityETH{value: ethAmount}(
       address(token_consists_of_lp),
       tokenReturnedAmount,
       Math.mulDiv(tokenReturnedAmount, 95, 100),
