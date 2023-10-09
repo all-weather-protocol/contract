@@ -42,7 +42,7 @@ describe("All Weather Protocol", function () {
         it("Reward Should be different, if they zap in different timeing", async function () {
             this.timeout(2400000); // Set timeout to 120 seconds
             expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
-            expect(await portfolioContract.userRewardPerTokenPaid(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
+            expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
             expect(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0])).to.equal(0);
             const receipt = await deposit(end2endTestingAmount, wallet, pendleGLPZapInData, pendleGDAIZapInData, oneInchSwapDataForGDAI, oneInchSwapDataForRETH, pendleRETHZapInData, oneInchSwapDataForMagic, pendlePendleZapInData);
 
@@ -69,7 +69,7 @@ describe("All Weather Protocol", function () {
                 expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, radiantVault.name(), rToken)).to.equal(0);
             }
             expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
-            expect(await portfolioContract.userRewardPerTokenPaid(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
+            expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
             const rewardsOfWallet2 = await portfolioContract.getClaimableRewards(wallet2.address);
             for (const [vaultIdx, claimableReward] of (await portfolioContract.getClaimableRewards(wallet.address)).entries()) {
                 if (claimableReward.protocol !== await radiantVault.name()) {

@@ -52,6 +52,7 @@ describe("All Weather Protocol", function () {
             protocol: "Equilibria-PENDLE", percentage: 0
         }
         ], portfolioContractName = "PermanentPortfolioLPToken");
+        console.log("portfolio address: ", portfolioContract.address);
     });
 
     describe("Portfolio LP Contract Test", function () {
@@ -66,9 +67,9 @@ describe("All Weather Protocol", function () {
             expect(rewardPerShareZappedIn2).to.be.gt(rewardPerShareZappedIn1);
 
             // claim
-            expect(await portfolioContract.userRewardPerTokenPaid(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
+            expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
             await (await portfolioContract.connect(wallet).claim(wallet.address, { gasLimit: 30000000 })).wait();
-            expect(await portfolioContract.userRewardPerTokenPaid(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0]));
+            expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0]));
             expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
             expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
 
@@ -80,7 +81,7 @@ describe("All Weather Protocol", function () {
             expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, radiantVault.name(), radiantRTokens[0])).to.be.gt(0);
             await (await portfolioContract.connect(wallet2).claim(wallet2.address, { gasLimit: 30000000 })).wait();
             expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
-            expect(await portfolioContract.userRewardPerTokenPaid(wallet2.address, radiantVault.name(), radiantRTokens[0])).to.equal(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0]));
+            expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet2.address, radiantVault.name(), radiantRTokens[0])).to.equal(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0]));
             const rewardPerShareZappedIn3 = await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0]);
             expect(rewardPerShareZappedIn3).to.be.gt(rewardPerShareZappedIn2);
         })
@@ -92,7 +93,7 @@ describe("All Weather Protocol", function () {
 
         //     await (await portfolioContract.connect(wallet).redeem(portfolioContract.balanceOf(wallet.address), wallet.address, fakePendleZapOut, { gasLimit: 30000000 })).wait();
         //     expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(0);
-        //     expect(await portfolioContract.userRewardPerTokenPaid(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0]));
+        //     expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, radiantVault.name(), radiantRTokens[0])).to.equal(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0]));
         //     expect(await portfolioContract.rewardPerShareZappedIn(radiantVault.name(), radiantRTokens[0])).to.be.gt(0);
         // })
     });

@@ -59,8 +59,15 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
   AbstractVault[] internal vaults;
   mapping(address => mapping(string => mapping(address => uint256)))
     public userRewardsOfInvestedProtocols;
+
+  // userRewardPerTokenPaidPointerMapping is like a pointer, it points out how much rewards we have planned to distribute to this user. Doesn't mean we have distributed it to the user. `userRewardsOfInvestedProtocols` is the one which record how much the user can claim. userRewardPerTokenPaidPointerMapping is a pointer for the contract to know whether the contract has distribute the rewards to the user's userRewardsOfInvestedProtocols at this round or not.
   mapping(address => mapping(string => mapping(address => uint256)))
-    public userRewardPerTokenPaid;
+    public userRewardPerTokenPaidPointerMapping;
+
+  // similar to userRewardPerTokenPaidPointerMapping, but this one is for the contract to know how much claimable rewards we can distribute to the user at this round, by thinking of `claimable - pointersOfEachClaimableReward` as allocatable rewards at this round. Will be reseted when someone trigger the `claim()` of that vault
+  mapping(address => mapping(address => uint256))
+    public pointersOfEachClaimableReward;
+
   mapping(string => mapping(address => uint256)) public rewardPerShareZappedIn;
   uint256 public constant UNIT_OF_SHARES = 10e15;
 
@@ -87,24 +94,31 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
       vaultIdx < totalClaimableRewards.length;
       vaultIdx++
     ) {
-      // empty the claimable rewards in these vaults, so that we won't re-calculate the `amount` back to `_updateSpecificReward()`
-      try vaults[vaultIdx].claim() {
-        // the reason why using try catch is that, sushiswap's rewarder might run out of rewards. Resulting in `harvest()` failure.
-        for (
-          uint256 rewardIdxOfThisVault = 0;
-          rewardIdxOfThisVault <
-          totalClaimableRewards[vaultIdx].claimableRewards.length;
-          rewardIdxOfThisVault++
-        ) {
-          _updateSpecificReward(
-            totalClaimableRewards[vaultIdx].protocol,
-            totalClaimableRewards[vaultIdx].claimableRewards[
-              rewardIdxOfThisVault
-            ]
-          );
-        }
-      } catch Error(string memory _errorMessage) {
-        emit ClaimError(_errorMessage);
+      for (
+        uint256 rewardIdxOfThisVault = 0;
+        rewardIdxOfThisVault <
+        totalClaimableRewards[vaultIdx].claimableRewards.length;
+        rewardIdxOfThisVault++
+      ) {
+        address addressOfReward = totalClaimableRewards[vaultIdx]
+          .claimableRewards[rewardIdxOfThisVault]
+          .token;
+        uint256 oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio = totalClaimableRewards[
+            vaultIdx
+          ].claimableRewards[rewardIdxOfThisVault].amount -
+            pointersOfEachClaimableReward[address(vaults[vaultIdx])][
+              addressOfReward
+            ];
+        pointersOfEachClaimableReward[address(vaults[vaultIdx])][
+          addressOfReward
+        ] = totalClaimableRewards[vaultIdx]
+          .claimableRewards[rewardIdxOfThisVault]
+          .amount;
+        _updateSpecificReward(
+          totalClaimableRewards[vaultIdx].protocol,
+          addressOfReward,
+          oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
+        );
       }
     }
     _;
@@ -311,25 +325,35 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
     ) {
       string memory protocolNameOfThisVault = totalClaimableRewards[vaultIdx]
         .protocol;
-      for (
-        uint256 rewardIdxOfThisVault = 0;
-        rewardIdxOfThisVault <
-        totalClaimableRewards[vaultIdx].claimableRewards.length;
-        rewardIdxOfThisVault++
-      ) {
-        address addressOfReward = totalClaimableRewards[vaultIdx]
-          .claimableRewards[rewardIdxOfThisVault]
-          .token;
-        SafeERC20.safeTransfer(
-          IERC20(addressOfReward),
-          receiver,
+      try vaults[vaultIdx].claim() {
+        for (
+          uint256 rewardIdxOfThisVault = 0;
+          rewardIdxOfThisVault <
+          totalClaimableRewards[vaultIdx].claimableRewards.length;
+          rewardIdxOfThisVault++
+        ) {
+          pointersOfEachClaimableReward[address(vaults[vaultIdx])][
+            totalClaimableRewards[vaultIdx]
+              .claimableRewards[rewardIdxOfThisVault]
+              .token
+          ] = 0;
+          address addressOfReward = totalClaimableRewards[vaultIdx]
+            .claimableRewards[rewardIdxOfThisVault]
+            .token;
+          SafeERC20.safeTransfer(
+            IERC20(addressOfReward),
+            receiver,
+            userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
+              addressOfReward
+            ]
+          );
           userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
             addressOfReward
-          ]
-        );
-        userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
-          addressOfReward
-        ] = 0;
+          ] = 0;
+        }
+      } catch Error(string memory _errorMessage) {
+        emit ClaimError(_errorMessage);
+        continue;
       }
     }
   }
@@ -421,7 +445,7 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
           _calculateRewardPerShareDuringThisPeriod(
             claimableRewardsAmountOfThisVault
           ) -
-          userRewardPerTokenPaid[owner][protocolNameOfThisVault][
+          userRewardPerTokenPaidPointerMapping[owner][protocolNameOfThisVault][
             addressOfReward
           ]) +
         userRewardsOfInvestedProtocols[owner][protocolNameOfThisVault][
@@ -433,16 +457,14 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
 
   function _updateSpecificReward(
     string memory protocolNameOfThisVault,
-    IFeeDistribution.RewardData memory claimableReward
+    address addressOfReward,
+    uint256 oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
   ) internal {
     if (msg.sender != address(0)) {
-      address addressOfReward = claimableReward.token;
-      uint256 oneOfTheUnclaimedRewardsBelongsToThisPortfolio = claimableReward
-        .amount;
       rewardPerShareZappedIn[protocolNameOfThisVault][
         addressOfReward
       ] += _calculateRewardPerShareDuringThisPeriod(
-        oneOfTheUnclaimedRewardsBelongsToThisPortfolio
+        oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
       );
       userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
         addressOfReward
@@ -450,7 +472,7 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
         protocolNameOfThisVault,
         addressOfReward
       );
-      userRewardPerTokenPaid[msg.sender][protocolNameOfThisVault][
+      userRewardPerTokenPaidPointerMapping[msg.sender][protocolNameOfThisVault][
         addressOfReward
       ] = rewardPerShareZappedIn[protocolNameOfThisVault][addressOfReward];
     }
@@ -462,13 +484,13 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
   ) internal view returns (uint256) {
     return
       (rewardPerShareZappedIn[protocolNameOfThisVault][addressOfReward] -
-        userRewardPerTokenPaid[msg.sender][protocolNameOfThisVault][
-          addressOfReward
-        ]) * balanceOf(msg.sender);
+        userRewardPerTokenPaidPointerMapping[msg.sender][
+          protocolNameOfThisVault
+        ][addressOfReward]) * balanceOf(msg.sender);
   }
 
   function _calculateRewardPerShareDuringThisPeriod(
-    uint256 oneOfTheUnclaimedRewardsBelongsToThisPortfolio
+    uint256 oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
   ) internal view returns (uint256) {
     // slither-disable-next-line incorrect-equality
     if (totalSupply() == 0) {
@@ -476,7 +498,7 @@ abstract contract BasePortfolio is ERC20, Ownable, ReentrancyGuard, Pausable {
     }
     return
       SafeMath.div(
-        oneOfTheUnclaimedRewardsBelongsToThisPortfolio,
+        oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio,
         totalSupply()
       );
   }
