@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "./3rd/radiant/IFeeDistribution.sol";
 import "./3rd/pendle/IPendleRouter.sol";
 import "./interfaces/AbstractVaultV2.sol";
-import "hardhat/console.sol";
+import "./vaults/apolloX/ApolloXDepositData.sol";
 
 abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   using SafeERC20 for IERC20;
@@ -35,8 +35,8 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
 
   struct DepositData {
     uint256 amount;
-    address tokenIn;
     address receiver;
+    ApolloXDepositData apolloXDepositData;
   }
 
   IERC20 public immutable asset;
@@ -158,15 +158,13 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
       address(this),
       depositData.amount
     );
-    uint256 amountAfterDeductingFee = _getAmountAfterDeductingFee(
-      depositData.amount
-    );
+    uint256 portfolioSharesToBeMinted = 0;
     for (uint256 idx = 0; idx < vaults.length; idx++) {
       // slither-disable-next-line calls-loop
       string memory nameOfThisVault = vaults[idx].name();
       bytes32 bytesOfvaultName = keccak256(bytes(nameOfThisVault));
       uint256 zapInAmountForThisVault = Math.mulDiv(
-        amountAfterDeductingFee,
+        depositData.amount,
         portfolioAllocation[nameOfThisVault],
         100
       );
@@ -189,11 +187,12 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
 
       if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
         // slither-disable-next-line calls-loop
-        console.log("Buying ApolloX-ALP token");
-        console.log(address(vaults[0]));
+        portfolioSharesToBeMinted = vaults[idx].deposit(
+          zapInAmountForThisVault,
+          depositData.apolloXDepositData
+        );
         require(
-          vaults[idx].deposit(zapInAmountForThisVault, depositData.tokenIn, 1) >
-            0,
+          portfolioSharesToBeMinted > 0,
           "Buying ApolloX-ALP token failed"
         );
       } else {
@@ -201,9 +200,8 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
       }
     }
 
-    // uint256 shares = SafeMath.div(amountAfterDeductingFee, UNIT_OF_SHARES);
-    // require(shares > 0, "Shares must > 0");
-    // _mint(depositData.receiver, shares);
+    require(portfolioSharesToBeMinted > 0, "Shares must > 0");
+    _mint(depositData.receiver, portfolioSharesToBeMinted);
   }
 
   function redeem(
@@ -427,14 +425,6 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
         oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio,
         totalSupply()
       );
-  }
-
-  function _getAmountAfterDeductingFee(
-    uint256 depositAmount
-  ) internal returns (uint256) {
-    uint256 protocolFee = Math.mulDiv(depositAmount, 3, 1000);
-    balanceOfProtocolFee += protocolFee;
-    return depositAmount - protocolFee;
   }
 
   // solhint-disable-next-line no-empty-blocks

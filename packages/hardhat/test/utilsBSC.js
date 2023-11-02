@@ -12,10 +12,12 @@ const end2endTestingStableCointAmount = ethers.utils.parseUnits('100', 18);
 
 async function initTokens() {
     const ALP = await ethers.getContractAt("IERC20", "0x4E47057f45adF24ba41375a175dA0357cB3480E5");
+    const APX = await ethers.getContractAt("IApolloX", "0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0");
     const USDC = await ethers.getContractAt('IERC20', "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
     return {
         ALP,
-        USDC
+        USDC,
+        APX
     }
 }
 async function getBeforeEachSetUp(allocations) {
@@ -42,11 +44,9 @@ async function getBeforeEachSetUp(allocations) {
 async function deployContracts(allocations, deployer) {
     const { ALP, USDC } = await initTokens();
 
-  console.log("EquilibriaGlpVault start deploying");
   const apolloxBsc = await ethers.getContractFactory("ApolloXBscVault");
   const apolloxBscVault = await apolloxBsc.connect(deployer).deploy(ALP.address, "ApolloX-ALP", "ALP-APO-ALP", {gasLimit:30000000});
   await apolloxBscVault.deployed();
-  console.log("apolloxBscVault deployed");
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
   const portfolioContract = await StableCoinVaultFactory.connect(deployer).deploy(USDC.address, "StableCoinLP", "SCLP", apolloxBscVault.address, {gasLimit:30000000});
@@ -76,12 +76,11 @@ async function deployContractsToChain(wallet, allocations, portfolioContractName
   return await deployContracts(wallet, dpxSLP, sushiMiniChefV2Address, sushiPid, oneInchAddress, pendleGlpMarketLPT, pendleGDAIMarketLPT, pendleRETHMarketLPT, radiantLendingPoolAddress, eqbMinterAddress, pendleBoosterAddress, allocations, portfolioContractName);
 }
 
-async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract) {
-  const { USDC } = await initTokens();
+async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract, apolloXDepositData) {
   const depositData = {
     amount: end2endTestingStableCointAmount,
-    tokenIn: USDC.address,
-    receiver: wallet.address
+    receiver: wallet.address,
+    apolloXDepositData
   }
   return await (await portfolioContract.connect(deployer).deposit(depositData, { gasLimit: 30000000 })).wait();
 }
@@ -98,6 +97,7 @@ async function simulateTimeElasped(timeElasped = 12 * 31 * 86400) {
 
 module.exports = {
     getBeforeEachSetUp,
+    initTokens,
     deposit,
     end2endTestingStableCointAmount
 };

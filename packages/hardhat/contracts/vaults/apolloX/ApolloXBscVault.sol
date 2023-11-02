@@ -9,10 +9,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "hardhat/console.sol";
 import "../../3rd/apolloX/IApolloX.sol";
 import "../../interfaces/AbstractVaultV2.sol";
 import "../../3rd/radiant/IFeeDistribution.sol";
+import "./ApolloXDepositData.sol";
 
 contract ApolloXBscVault is AbstractVaultV2 {
   using SafeERC20 for IERC20;
@@ -63,11 +63,10 @@ contract ApolloXBscVault is AbstractVaultV2 {
 
   function _zapIn(
     uint256 amount,
-    address tokenIn,
-    uint256 minAlp
+    ApolloXDepositData calldata apolloXDepositData
   ) internal override returns (uint256) {
-    IERC20 tokenInERC20 = IERC20(tokenIn);
-    if (tokenIn != address(USDC)) {
+    IERC20 tokenInERC20 = IERC20(apolloXDepositData.tokenIn);
+    if (apolloXDepositData.tokenIn != address(USDC)) {
       revert("Only USDC is supported for now");
     }
     uint256 currentAllowance = tokenInERC20.allowance(
@@ -81,7 +80,12 @@ contract ApolloXBscVault is AbstractVaultV2 {
     SafeERC20.safeApprove(tokenInERC20, address(apolloX), amount);
     SafeERC20.safeApprove(ALP, address(apolloX), amount);
     uint256 originalStakeOf = apolloX.stakeOf(address(this));
-    apolloX.mintAlp(address(tokenInERC20), 100, minAlp, true);
+    apolloX.mintAlp(
+      address(tokenInERC20),
+      amount,
+      apolloXDepositData.minALP,
+      true
+    );
     uint256 currentStakeOf = apolloX.stakeOf(address(this));
     uint256 mintedALPAmount = currentStakeOf - originalStakeOf;
     return mintedALPAmount;

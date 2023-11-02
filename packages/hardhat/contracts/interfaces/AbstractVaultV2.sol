@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../3rd/radiant/IFeeDistribution.sol";
 import "../3rd/pendle/IPendleRouter.sol";
+import "../vaults/apolloX/ApolloXDepositData.sol";
 
 abstract contract AbstractVaultV2 is ERC4626, Ownable {
   using SafeERC20 for IERC20;
@@ -46,11 +47,10 @@ abstract contract AbstractVaultV2 is ERC4626, Ownable {
 
   function deposit(
     uint256 amount,
-    address tokenIn,
-    uint256 minAlp
+    ApolloXDepositData calldata apolloXDepositData
   ) public virtual returns (uint256) {
-    _prepareForDeposit(amount, tokenIn);
-    uint256 shares = _zapIn(amount, tokenIn, minAlp);
+    _prepareForDeposit(amount, apolloXDepositData.tokenIn);
+    uint256 shares = _zapIn(amount, apolloXDepositData);
     return _mintShares(shares, amount);
   }
 
@@ -69,8 +69,7 @@ abstract contract AbstractVaultV2 is ERC4626, Ownable {
 
   function _zapIn(
     uint256 amount,
-    address tokenIn,
-    uint256 minAlp
+    ApolloXDepositData calldata apolloXDepositData
   ) internal virtual returns (uint256) {
     revert("_zapIn not implemented");
   }
