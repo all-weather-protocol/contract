@@ -5,7 +5,8 @@ const {
   getBeforeEachSetUp,
   initTokens,
   gasLimit,
-  simulateTimeElasped
+  simulateTimeElasped,
+  mineBlocks
 } = require("./utilsBSC");
 
 
@@ -45,7 +46,7 @@ describe("All Weather Protocol", function () {
             expect((await contracts.apolloxBscVault.totalAssets())).to.equal(decodedEvent.shares);
 
             // at the time of writing, the price of ALP is 1.1175, so 100 USDC should be able to mint 89.307284980382532996 ALP
-            expect(await contracts.portfolioContract.balanceOf(wallet.address)).to.equal(ethers.BigNumber.from("89307284980382532996"));
+            expect(await contracts.portfolioContract.balanceOf(wallet.address)).to.equal(ethers.BigNumber.from("8930728498"));
             expect((await APX.stakeOf(contracts.apolloxBscVault.address))).to.equal(decodedEvent.shares);
           }
         }
@@ -71,7 +72,23 @@ describe("All Weather Protocol", function () {
         }
       }, { gasLimit });
     })
+    it("Should be able to check claimable rewards", async function () {
+      const claimableRewards = await contracts.portfolioContract.getClaimableRewards(wallet.address);
+      for (const protocol of claimableRewards) {
+        expect(protocol.claimableRewards).to.deep.equal([]);
+      }
+      const apolloXDepositData = {
+        tokenIn: USDC.address,
+        // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
+        minALP: (ethers.utils.parseEther("100")).div(12).mul(10)
+      }
+      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, apolloXDepositData);
+      await mineBlocks(100);
+      const newClaimableRewards = await contracts.portfolioContract.getClaimableRewards(wallet.address);
+      expect(newClaimableRewards[0].claimableRewards[0].amount).to.be.gt(ethers.BigNumber.from("0"));
+    })
     it("Should be able to claim ALP reward", async function () {
+      
     })
   });
 });

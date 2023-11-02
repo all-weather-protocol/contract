@@ -62,7 +62,7 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     public pointersOfEachClaimableReward;
 
   mapping(string => mapping(address => uint256)) public rewardPerShareZappedIn;
-  uint256 public constant UNIT_OF_SHARES = 10e15;
+  uint256 public constant UNIT_OF_SHARES = 1e10;
 
   constructor(
     address asset_,
@@ -206,8 +206,9 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
       }
     }
 
-    require(portfolioSharesToBeMinted > 0, "Shares must > 0");
-    _mint(depositData.receiver, portfolioSharesToBeMinted);
+    uint256 shares = SafeMath.div(portfolioSharesToBeMinted, UNIT_OF_SHARES);
+    require(shares > 0, "Shares must > 0");
+    _mint(depositData.receiver, shares);
   }
 
   function redeem(
@@ -333,10 +334,6 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
       });
     }
     return totalClaimableRewards;
-  }
-
-  function claimProtocolFee() external onlyOwner {
-    SafeERC20.safeTransfer(asset, msg.sender, balanceOfProtocolFee);
   }
 
   function rescueFunds(
