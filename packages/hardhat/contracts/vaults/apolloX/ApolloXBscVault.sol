@@ -14,7 +14,6 @@ import "../../interfaces/AbstractVaultV2.sol";
 import "../../3rd/radiant/IFeeDistribution.sol";
 import "./ApolloXDepositData.sol";
 import "./ApolloXRedeemData.sol";
-import "hardhat/console.sol";
 
 contract ApolloXBscVault is AbstractVaultV2 {
   using SafeERC20 for IERC20;

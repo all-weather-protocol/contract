@@ -68,6 +68,7 @@ abstract contract AbstractVaultV2 is ERC4626, Ownable {
     );
   }
 
+  /* solhint-disable no-unused-vars */
   function _zapIn(
     uint256 amount,
     ApolloXDepositData calldata apolloXDepositData
@@ -86,14 +87,15 @@ abstract contract AbstractVaultV2 is ERC4626, Ownable {
     return shares;
   }
 
-  /* solhint-enable no-unused-vars */
-
+  /* solhint-disable no-unused-vars */
   function redeem(
     uint256 shares,
     ApolloXRedeemData calldata apolloXRedeemData
   ) public virtual returns (uint256) {
     revert("Not implemented");
   }
+
+  /* solhint-enable no-unused-vars */
 
   /* solhint-disable no-unused-vars */
   function claim() public virtual {
