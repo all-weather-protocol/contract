@@ -13,11 +13,13 @@ const gasLimit = 30000000;
 
 async function initTokens() {
     const ALP = await ethers.getContractAt("IERC20", "0x4E47057f45adF24ba41375a175dA0357cB3480E5");
-    const APX = await ethers.getContractAt("IApolloX", "0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0");
+    const ApolloX = await ethers.getContractAt("IApolloX", "0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0");
     const USDC = await ethers.getContractAt('IERC20', "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
+    const APX = await ethers.getContractAt('IERC20', "0x78F5d389F5CDCcFc41594aBaB4B0Ed02F31398b3");
     return {
         ALP,
         USDC,
+        ApolloX,
         APX
     }
 }
