@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../3rd/radiant/IFeeDistribution.sol";
 import "../3rd/pendle/IPendleRouter.sol";
 import "../vaults/apolloX/ApolloXDepositData.sol";
+import "../vaults/apolloX/ApolloXRedeemData.sol";
 
 abstract contract AbstractVaultV2 is ERC4626, Ownable {
   using SafeERC20 for IERC20;
@@ -85,27 +86,14 @@ abstract contract AbstractVaultV2 is ERC4626, Ownable {
     return shares;
   }
 
-  /* solhint-disable no-unused-vars */
-  function redeem() public virtual {
-    revert("Not implemented");
-  }
-
-  /* solhint-disable no-unused-vars */
-  function redeem(uint256 shares) public virtual {
-    revert("Not implemented");
-  }
-
   /* solhint-enable no-unused-vars */
 
-  /* solhint-disable no-unused-vars */
   function redeem(
     uint256 shares,
-    IPendleRouter.TokenOutput calldata output
-  ) public virtual {
+    ApolloXRedeemData calldata apolloXRedeemData
+  ) public virtual returns (uint256) {
     revert("Not implemented");
   }
-
-  /* solhint-enable no-unused-vars */
 
   /* solhint-disable no-unused-vars */
   function claim() public virtual {

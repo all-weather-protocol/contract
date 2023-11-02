@@ -13,11 +13,14 @@ import "../../3rd/apolloX/IApolloX.sol";
 import "../../interfaces/AbstractVaultV2.sol";
 import "../../3rd/radiant/IFeeDistribution.sol";
 import "./ApolloXDepositData.sol";
+import "./ApolloXRedeemData.sol";
+import "hardhat/console.sol";
 
 contract ApolloXBscVault is AbstractVaultV2 {
   using SafeERC20 for IERC20;
   using Math for uint256;
 
+  error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
   event WithdrawFailed(address token);
 
   IApolloX public apolloX =
@@ -91,10 +94,40 @@ contract ApolloXBscVault is AbstractVaultV2 {
     return mintedALPAmount;
   }
 
-  function redeem(uint256 shares) public override {
+  function redeem(
+    uint256 shares,
+    ApolloXRedeemData calldata apolloXRedeemData
+  ) public override returns (uint256) {
+    // this part was directly copy from ERC4626.sol
+    uint256 maxShares = maxRedeem(msg.sender);
+    if (shares > maxShares) {
+      revert ERC4626ExceededMaxRedeem(msg.sender, shares, maxShares);
+    }
+    _burn(msg.sender, shares);
+
     apolloX.unStake(shares);
-    apolloX.burnAlp(address(USDC), shares, 1, msg.sender);
-    super.redeem(shares, msg.sender, msg.sender);
+    uint256 currentAllowance = ALP.allowance(address(this), address(apolloX));
+    if (currentAllowance > 0) {
+      SafeERC20.safeApprove(ALP, address(apolloX), 0);
+    }
+    SafeERC20.safeApprove(ALP, address(apolloX), shares);
+    uint256 originalTokenOutBalance = IERC20(apolloXRedeemData.tokenOut)
+      .balanceOf(address(this));
+    apolloX.burnAlp(
+      apolloXRedeemData.tokenOut,
+      shares,
+      apolloXRedeemData.minOut,
+      address(this)
+    );
+    uint256 currentTokenOutBalance = IERC20(apolloXRedeemData.tokenOut)
+      .balanceOf(address(this));
+    uint256 redeemAmount = currentTokenOutBalance - originalTokenOutBalance;
+    SafeERC20.safeTransfer(
+      IERC20(apolloXRedeemData.tokenOut),
+      msg.sender,
+      redeemAmount
+    );
+    return redeemAmount;
   }
 
   function claim() public override {

@@ -3,7 +3,9 @@ const {
   end2endTestingStableCointAmount,
   deposit,
   getBeforeEachSetUp,
-  initTokens
+  initTokens,
+  gasLimit,
+  simulateTimeElasped
 } = require("./utilsBSC");
 
 
@@ -48,7 +50,28 @@ describe("All Weather Protocol", function () {
           }
         }
       }
-
     });
+    it("Should be able to burn ALP and redeem to USDC", async function () {
+      this.timeout(240000); // Set timeout to 120 seconds
+      const apolloXDepositData = {
+        tokenIn: USDC.address,
+        // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
+        minALP: (ethers.utils.parseEther("100")).div(12).mul(10)
+      }
+      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, apolloXDepositData);
+      await simulateTimeElasped(86400*2); // there's a 1-day constraint for redeeming ALP
+
+      const shares = contracts.portfolioContract.balanceOf(wallet.address);
+      await contracts.portfolioContract.connect(wallet).redeem({
+        amount: shares,
+        receiver: wallet.address,
+        apolloXRedeemData: {
+          tokenOut: USDC.address,
+          minOut: ethers.utils.parseEther("99")
+        }
+      }, { gasLimit });
+    })
+    it("Should be able to claim ALP reward", async function () {
+    })
   });
 });

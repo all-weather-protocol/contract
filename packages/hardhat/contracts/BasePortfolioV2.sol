@@ -13,6 +13,7 @@ import "./3rd/radiant/IFeeDistribution.sol";
 import "./3rd/pendle/IPendleRouter.sol";
 import "./interfaces/AbstractVaultV2.sol";
 import "./vaults/apolloX/ApolloXDepositData.sol";
+import "./vaults/apolloX/ApolloXRedeemData.sol";
 
 abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   using SafeERC20 for IERC20;
@@ -37,6 +38,11 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     uint256 amount;
     address receiver;
     ApolloXDepositData apolloXDepositData;
+  }
+  struct RedeemData {
+    uint256 amount;
+    address receiver;
+    ApolloXRedeemData apolloXRedeemData;
   }
 
   IERC20 public immutable asset;
@@ -205,27 +211,31 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   }
 
   function redeem(
-    uint256 shares,
-    address payable receiver
+    RedeemData calldata redeemData
   ) public updateRewards whenNotPaused nonReentrant {
-    require(shares <= totalSupply(), "Shares exceed total supply");
+    require(redeemData.amount <= totalSupply(), "Shares exceed total supply");
     for (uint256 i = 0; i < vaults.length; i++) {
       uint256 vaultShares = Math.mulDiv(
         vaults[i].balanceOf(address(this)),
-        shares,
+        redeemData.amount,
         totalSupply()
       );
       bytes32 bytesOfvaultName = keccak256(bytes(vaults[i].name()));
       if (vaultShares > 0) {
-        vaults[i].redeem(vaultShares);
-        SafeERC20.safeTransfer(
-          IERC20(vaults[i].asset()),
-          receiver,
-          vaultShares
-        );
+        if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
+          uint256 redeemAmount = vaults[i].redeem(
+            vaultShares,
+            redeemData.apolloXRedeemData
+          );
+          SafeERC20.safeTransfer(
+            IERC20(redeemData.apolloXRedeemData.tokenOut),
+            redeemData.receiver,
+            redeemAmount
+          );
+        }
       }
     }
-    _burn(msg.sender, shares);
+    _burn(msg.sender, redeemData.amount);
   }
 
   function claim(address payable receiver) external whenNotPaused nonReentrant {

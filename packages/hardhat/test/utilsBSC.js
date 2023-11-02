@@ -9,6 +9,7 @@ config();
 const myImpersonatedWalletAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const myImpersonatedWalletAddress2 = "0x2170Ed0880ac9A755fd29B2688956BD959F933F8";
 const end2endTestingStableCointAmount = ethers.utils.parseUnits('100', 18);
+const gasLimit = 30000000;
 
 async function initTokens() {
     const ALP = await ethers.getContractAt("IERC20", "0x4E47057f45adF24ba41375a175dA0357cB3480E5");
@@ -94,10 +95,20 @@ async function simulateTimeElasped(timeElasped = 12 * 31 * 86400) {
   await ethers.provider.send('evm_mine');
 }
 
+async function mineBlocks(numBlocks) {
+  for (let i = 0; i < numBlocks; i++) {
+    await network.provider.send("evm_mine");
+  }
+}
+
+
 
 module.exports = {
     getBeforeEachSetUp,
     initTokens,
     deposit,
-    end2endTestingStableCointAmount
+    end2endTestingStableCointAmount,
+    gasLimit,
+    mineBlocks,
+    simulateTimeElasped
 };
