@@ -8,7 +8,7 @@ config();
 // wallets
 const myImpersonatedWalletAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const myImpersonatedWalletAddress2 = "0x2170Ed0880ac9A755fd29B2688956BD959F933F8";
-const end2endTestingStableCointAmount = ethers.utils.parseUnits('100', 18);
+const end2endTestingStableCointAmount = ethers.utils.parseUnits('50', 18);
 const gasLimit = 30000000;
 
 async function initTokens() {
@@ -50,6 +50,8 @@ async function deployContracts(allocations, deployer) {
   const apolloxBsc = await ethers.getContractFactory("ApolloXBscVault");
   const apolloxBscVault = await apolloxBsc.connect(deployer).deploy(ALP.address, "ApolloX-ALP", "ALP-APO-ALP", {gasLimit:30000000});
   await apolloxBscVault.deployed();
+  // performance fee: 9.7%. However, the yield from APX consists of appreciation of principal and APX token, so the performance fee is 100% take from APX token.
+  await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10);
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
   const portfolioContract = await StableCoinVaultFactory.connect(deployer).deploy(USDC.address, "StableCoinLP", "SCLP", apolloxBscVault.address, {gasLimit:30000000});

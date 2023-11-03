@@ -29,6 +29,8 @@ contract ApolloXBscVault is AbstractVaultV2 {
     IERC20(0x78F5d389F5CDCcFc41594aBaB4B0Ed02F31398b3);
   IERC20 public constant USDC =
     IERC20(0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d);
+  uint256 public ratioAfterPerformanceFee = 1;
+  uint256 public denominator = 1;
 
   constructor(
     IERC20Metadata asset_,
@@ -44,6 +46,19 @@ contract ApolloXBscVault is AbstractVaultV2 {
   function updateAlpAddr(address newAddr) public onlyOwner {
     require(newAddr != address(0), "Address cannot be zero");
     ALP = IERC20(newAddr);
+  }
+
+  function updatePerformanceFeeMetaData(
+    uint256 ratioAfterPerformanceFee_,
+    uint256 denominator_
+  ) public onlyOwner {
+    require(denominator_ != 0, "denominator cannot be zero");
+    require(
+      ratioAfterPerformanceFee_ <= denominator_,
+      "ratioAfterPerformanceFee_ cannot be greater than denominator_"
+    );
+    ratioAfterPerformanceFee = ratioAfterPerformanceFee_;
+    denominator = denominator_;
   }
 
   function totalLockedAssets() public pure override returns (uint256) {
@@ -152,14 +167,41 @@ contract ApolloXBscVault is AbstractVaultV2 {
       return new IFeeDistribution.RewardData[](0);
     }
     rewards = new IFeeDistribution.RewardData[](1);
+
+    uint256 claimableRewardsBelongsToThisPortfolio = Math.mulDiv(
+      apolloX.pendingApx(address(this)),
+      portfolioSharesInThisVault,
+      totalVaultShares
+    );
     rewards[0] = IFeeDistribution.RewardData({
       token: address(APX),
-      amount: Math.mulDiv(
-        apolloX.pendingApx(address(this)),
-        portfolioSharesInThisVault,
-        totalVaultShares
+      amount: _calClaimableAmountAfterPerformanceFee(
+        claimableRewardsBelongsToThisPortfolio
       )
     });
     return rewards;
+  }
+
+  function _calClaimableAmountAfterPerformanceFee(
+    uint256 claimableRewardsBelongsToThisPortfolio
+  ) internal view returns (uint256) {
+    (
+      uint256 ratioAfterPerformanceFee,
+      uint256 denominator
+    ) = getPerformanceFeeRateMetaData();
+    return
+      Math.mulDiv(
+        claimableRewardsBelongsToThisPortfolio,
+        ratioAfterPerformanceFee,
+        denominator
+      );
+  }
+
+  function getPerformanceFeeRateMetaData()
+    public
+    view
+    returns (uint256, uint256)
+  {
+    return (ratioAfterPerformanceFee, denominator);
   }
 }
