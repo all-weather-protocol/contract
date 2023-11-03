@@ -118,7 +118,7 @@ describe("All Weather Protocol", function () {
       
       // claim performance Fee
       const originalApxBalance = await APX.balanceOf(wallet.address);
-      const claimHexData = contracts.apolloxBscVault.interface.encodeFunctionData("transfer", [wallet.address, claimablePerformanceFee]);
+      const claimHexData = APX.interface.encodeFunctionData("transfer", [wallet.address, claimablePerformanceFee]);
       await contracts.apolloxBscVault.rescueFundsWithHexData(APX.address, 0, claimHexData);
       const currentApxBalance = await APX.balanceOf(wallet.address);
       expect(currentApxBalance-originalApxBalance).to.eq(184238938045718);
