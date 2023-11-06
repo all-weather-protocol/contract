@@ -1,5 +1,4 @@
 require("dotenv").config();
-const { utils } = require("ethers");
 const fs = require("fs");
 const chalk = require("chalk");
 
@@ -10,7 +9,7 @@ require("hardhat-deploy");
 require("@nomiclabs/hardhat-ethers");
 require('@openzeppelin/hardhat-upgrades');
 const { PRIVATE_KEY } = process.env;
-const { isAddress, getAddress, formatUnits, parseUnits } = utils;
+const { isAddress, getAddress, formatUnits, parseUnits } =  require("ethers");
 
 /*
       📡 This is where you configure your deploy configuration for 🏗 scaffold-eth
