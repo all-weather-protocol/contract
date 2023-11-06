@@ -8,6 +8,7 @@ require("@tenderly/hardhat-tenderly");
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-deploy");
 require("@nomiclabs/hardhat-ethers");
+require('@openzeppelin/hardhat-upgrades');
 const { PRIVATE_KEY } = process.env;
 const { isAddress, getAddress, formatUnits, parseUnits } = utils;
 

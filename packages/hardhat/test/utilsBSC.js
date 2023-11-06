@@ -1,5 +1,5 @@
 const { config } = require('dotenv');
-const { network, ethers } = require("hardhat");
+const { network, ethers, upgrades } = require("hardhat");
 const got = require('got');
 const fs = require('fs');
 const path = require('path');
@@ -8,7 +8,7 @@ config();
 // wallets
 const myImpersonatedWalletAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const myImpersonatedWalletAddress2 = "0x2170Ed0880ac9A755fd29B2688956BD959F933F8";
-const end2endTestingStableCointAmount = ethers.utils.parseUnits('50', 18);
+const end2endTestingStableCointAmount = ethers.parseUnits('50', 18);
 const gasLimit = 30000000;
 
 async function initTokens() {
@@ -30,9 +30,9 @@ async function getBeforeEachSetUp(allocations) {
 // await weth.connect(wallet).deposit({ value: ethers.utils.parseEther("1"), gasLimit });
 // await weth.connect(wallet2).deposit({ value: ethers.utils.parseEther("0.1"), gasLimit });
     
-  const contracts = await deployContracts(allocations, deployer);
+  const contracts = await deployContracts(allocations, deployer, wallet2);
 
-//   await (await weth.connect(wallet2).approve(portfolioContract.address, ethers.constants.MaxUint256, { gasLimit })).wait();
+//   await (await weth.connect(wallet2).approve(portfolioContract.target, ethers.constants.MaxUint256, { gasLimit })).wait();
 
 //   portfolioShares = amountAfterChargingFee.div(await portfolioContract.UNIT_OF_SHARES());
   return {
@@ -44,26 +44,31 @@ async function getBeforeEachSetUp(allocations) {
 }
 
 
-async function deployContracts(allocations, deployer) {
-    const { ALP, USDC } = await initTokens();
+async function deployContracts(allocations, deployer, wallet2) {
+  const { ALP, USDC } = await initTokens();
 
   const apolloxBsc = await ethers.getContractFactory("ApolloXBscVault");
-  const apolloxBscVault = await apolloxBsc.connect(deployer).deploy(ALP.address, "ApolloX-ALP", "ALP-APO-ALP", {gasLimit:30000000});
-  await apolloxBscVault.deployed();
+  const deployerConnectedFactory = apolloxBsc.connect(deployer);
+
+  const apolloxBscVault = await upgrades.deployProxy(deployerConnectedFactory, [ALP.target, "ApolloX-ALP", "ALP-APO-ALP", 1, 1], {gasLimit:30000000, kind: 'uups'});
+  await apolloxBscVault.waitForDeployment();
   // performance fee: 9.7%. However, the yield from APX consists of appreciation of principal and APX token, so the performance fee is 100% take from APX token.
+  await upgrades.admin.changeProxyAdmin(apolloxBscVault.target, deployer.address);
   await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10);
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
-  const portfolioContract = await StableCoinVaultFactory.connect(deployer).deploy(USDC.address, "StableCoinLP", "SCLP", apolloxBscVault.address, {gasLimit:30000000});
+  const portfolioContract = await StableCoinVaultFactory.connect(deployer).deploy(USDC.target, "StableCoinLP", "SCLP", apolloxBscVault.target, {gasLimit:30000000});
+  await portfolioContract.waitForDeployment();
 
-  await portfolioContract.connect(deployer).deployed();
   await portfolioContract.setVaultAllocations(allocations).then((tx) => tx.wait());
   await _checkAllcation(allocations, portfolioContract);
 
-  await (await USDC.connect(deployer).approve(portfolioContract.address, ethers.constants.MaxUint256, { gasLimit:30000000 })).wait();
-  await (await ALP.connect(deployer).approve(portfolioContract.address, ethers.constants.MaxUint256, { gasLimit:30000000 })).wait();
+  await (await USDC.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
+  await (await ALP.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
 
-  return {portfolioContract, apolloxBscVault};
+  return {
+    portfolioContract, 
+    apolloxBscVault};
 }
 
 async function _checkAllcation(allocations, portfolioContract) {

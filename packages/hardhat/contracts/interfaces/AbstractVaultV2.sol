@@ -2,19 +2,49 @@
 
 pragma solidity 0.8.18;
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
+
 import "../3rd/radiant/IFeeDistribution.sol";
 import "../3rd/pendle/IPendleRouter.sol";
 import "../vaults/apolloX/ApolloXDepositData.sol";
 import "../vaults/apolloX/ApolloXRedeemData.sol";
 
-abstract contract AbstractVaultV2 is ERC4626, Ownable {
+abstract contract AbstractVaultV2 is
+  Initializable,
+  UUPSUpgradeable,
+  ERC4626Upgradeable,
+  OwnableUpgradeable,
+  PausableUpgradeable
+{
   using SafeERC20 for IERC20;
   using SafeMath for uint256;
 
   address public oneInchAggregatorAddress;
+
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  function _initialize(
+    IERC20MetadataUpgradeable asset_,
+    string memory name_,
+    string memory symbol_
+  ) public onlyInitializing {
+    ERC4626Upgradeable.__ERC4626_init(asset_);
+    ERC20Upgradeable.__ERC20_init(name_, symbol_);
+    OwnableUpgradeable.__Ownable_init();
+  }
+
+  function _authorizeUpgrade(address) internal override onlyOwner {}
 
   function updateOneInchAggregatorAddress(
     address oneInchAggregatorAddress_

@@ -32,33 +32,31 @@ describe("All Weather Protocol", function () {
     it("Should be able to mint ALP with USDC", async function () {
       this.timeout(240000); // Set timeout to 120 seconds
       const apolloXDepositData = {
-        tokenIn: USDC.address,
+        tokenIn: USDC.target,
         // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
-        minALP: (ethers.utils.parseEther("50")).div(12).mul(10)
+        minALP: ethers.parseEther("50")/ BigInt(12) * BigInt(10)
       }
       const receipt = await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, apolloXDepositData);
-
       // Iterate over the events and find the Deposit event
-      for (const event of receipt.events) {
-        if (event.topics.includes(contracts.apolloxBscVault.interface.getEventTopic('Deposit')) && event.address === contracts.apolloxBscVault.address) {
-          const decodedEvent = contracts.apolloxBscVault.interface.decodeEventLog('Deposit', event.data, event.topics);
-          if (decodedEvent.owner === contracts.portfolioContract.address) {
-            expect(await contracts.apolloxBscVault.balanceOf(contracts.portfolioContract.address)).to.equal(decodedEvent.shares);
-            expect((await contracts.apolloxBscVault.totalAssets())).to.equal(decodedEvent.shares);
+      for (const event of receipt.logs) {
+        if (event.eventName === 'Transfer' && event.args[1] === contracts.apolloxBscVault.target && event.args[0] === '0x0000000000000000000000000000000000000000') {
+            shares = event.args[2]
+            expect(await contracts.apolloxBscVault.balanceOf(contracts.portfolioContract.target)).to.equal(shares);
+            expect((await contracts.apolloxBscVault.totalAssets())).to.equal(shares);
 
             // at the time of writing, the price of ALP is 1.1175, so 100 USDC should be able to mint 89.307284980382532996 ALP
-            expect(await contracts.portfolioContract.balanceOf(wallet.address)).to.equal(ethers.BigNumber.from("4465364249"));
-            expect((await ApolloX.stakeOf(contracts.apolloxBscVault.address))).to.equal(decodedEvent.shares);
+            expect(await contracts.portfolioContract.balanceOf(wallet.address)).to.equal(4465364249n);
+            expect((await ApolloX.stakeOf(contracts.apolloxBscVault.target))).to.equal(shares);
           }
         }
       }
-    });
+    );
     it("Should be able to burn ALP and redeem to USDC", async function () {
       this.timeout(240000); // Set timeout to 120 seconds
       const apolloXDepositData = {
-        tokenIn: USDC.address,
+        tokenIn: USDC.target,
         // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
-        minALP: (ethers.utils.parseEther("50")).div(12).mul(10)
+        minALP: ethers.parseEther("50")/ BigInt(12) * BigInt(10)
       }
       await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, apolloXDepositData);
       await simulateTimeElasped(86400*2); // there's a 1-day constraint for redeeming ALP
@@ -68,8 +66,8 @@ describe("All Weather Protocol", function () {
         amount: shares,
         receiver: wallet.address,
         apolloXRedeemData: {
-          tokenOut: USDC.address,
-          minOut: ethers.utils.parseEther("49")
+          tokenOut: USDC.target,
+          minOut: ethers.parseEther("49")
         }
       }, { gasLimit });
     })
@@ -79,9 +77,9 @@ describe("All Weather Protocol", function () {
         expect(protocol.claimableRewards).to.deep.equal([]);
       }
       const apolloXDepositData = {
-        tokenIn: USDC.address,
+        tokenIn: USDC.target,
         // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
-        minALP: (ethers.utils.parseEther("50")).div(12).mul(10)
+        minALP: ethers.parseEther("50")/ BigInt(12) * BigInt(10)
       }
       await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, apolloXDepositData);
       await mineBlocks(100);
@@ -90,9 +88,9 @@ describe("All Weather Protocol", function () {
     })
     it("Should be able to claim ALP reward", async function () {
       const apolloXDepositData = {
-        tokenIn: USDC.address,
+        tokenIn: USDC.target,
         // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
-        minALP: (ethers.utils.parseEther("50")).div(12).mul(10)
+        minALP: ethers.parseEther("50") / BigInt(12) * BigInt(10)
       }
       await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, apolloXDepositData);
       await mineBlocks(100);
@@ -104,22 +102,22 @@ describe("All Weather Protocol", function () {
     })
     it("Should be able to claim performance fee", async function () {
       const apolloXDepositData = {
-        tokenIn: USDC.address,
+        tokenIn: USDC.target,
         // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
-        minALP: (ethers.utils.parseEther("50")).div(12).mul(10)
+        minALP: ethers.parseEther("50")/ BigInt(12) * BigInt(10)
       }
       await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, apolloXDepositData);
       await mineBlocks(100);
       const claimableRewards = await contracts.portfolioContract.getClaimableRewards(wallet.address);
       await contracts.portfolioContract.connect(wallet).claim(wallet.address);
-      const claimablePerformanceFee = await APX.balanceOf(contracts.apolloxBscVault.address);
+      const claimablePerformanceFee = await APX.balanceOf(contracts.apolloxBscVault.target);
       // currently, the performance fee is set to 80%, therefore, claimablePerformanceFee*4: claimalbeRewards = 1:1 = 20%*4 = 80%
-      expect(claimablePerformanceFee*4-claimableRewards[0].claimableRewards[0].amount).to.be.lt(100000000000000);
+      expect(claimablePerformanceFee*4n-claimableRewards[0].claimableRewards[0].amount).to.be.lt(100000000000000n);
       
       // claim performance Fee
       const originalApxBalance = await APX.balanceOf(wallet.address);
       const claimHexData = APX.interface.encodeFunctionData("transfer", [wallet.address, claimablePerformanceFee]);
-      await contracts.apolloxBscVault.rescueFundsWithHexData(APX.address, 0, claimHexData);
+      await contracts.apolloxBscVault.connect(deployer).rescueFundsWithHexData(APX.target, 0, claimHexData);
       const currentApxBalance = await APX.balanceOf(wallet.address);
       expect(currentApxBalance-originalApxBalance).to.eq(184238938045718);
     })

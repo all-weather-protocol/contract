@@ -8,12 +8,13 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "../../3rd/apolloX/IApolloX.sol";
 import "../../interfaces/AbstractVaultV2.sol";
 import "../../3rd/radiant/IFeeDistribution.sol";
 import "./ApolloXDepositData.sol";
 import "./ApolloXRedeemData.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
 
 contract ApolloXBscVault is AbstractVaultV2 {
   using SafeERC20 for IERC20;
@@ -22,21 +23,29 @@ contract ApolloXBscVault is AbstractVaultV2 {
   error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
   event WithdrawFailed(address token);
 
-  IApolloX public apolloX =
-    IApolloX(0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0);
-  IERC20 public ALP = IERC20(0x4E47057f45adF24ba41375a175dA0357cB3480E5);
+  IApolloX public apolloX;
+  IERC20 public ALP;
   IERC20 public constant APX =
     IERC20(0x78F5d389F5CDCcFc41594aBaB4B0Ed02F31398b3);
   IERC20 public constant USDC =
     IERC20(0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d);
-  uint256 public ratioAfterPerformanceFee = 1;
-  uint256 public denominator = 1;
+  uint256 public ratioAfterPerformanceFee;
+  uint256 public denominator;
 
-  constructor(
-    IERC20Metadata asset_,
+  function initialize(
+    IERC20MetadataUpgradeable asset_,
     string memory name_,
-    string memory symbol_
-  ) ERC4626(asset_) ERC20(name_, symbol_) Ownable() {}
+    string memory symbol_,
+    uint256 ratioAfterPerformanceFee_,
+    uint256 denominator_
+  ) public initializer {
+    AbstractVaultV2._initialize(asset_, name_, symbol_);
+
+    apolloX = IApolloX(0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0);
+    ALP = IERC20(0x4E47057f45adF24ba41375a175dA0357cB3480E5);
+    ratioAfterPerformanceFee = ratioAfterPerformanceFee_;
+    denominator = denominator_;
+  }
 
   function updateApolloXAddr(address newAddr) public onlyOwner {
     require(newAddr != address(0), "Address cannot be zero");

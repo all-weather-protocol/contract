@@ -9,6 +9,7 @@ contract StableCoinVault is BasePortfolioV2 {
   using SafeERC20 for IERC20;
   using SafeMath for uint256;
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
   constructor(
     address asset_,
     string memory name_,
