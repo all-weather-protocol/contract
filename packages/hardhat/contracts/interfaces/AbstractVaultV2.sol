@@ -44,6 +44,7 @@ abstract contract AbstractVaultV2 is
     OwnableUpgradeable.__Ownable_init();
   }
 
+  // solhint-disable-next-line no-empty-blocks
   function _authorizeUpgrade(address) internal override onlyOwner {}
 
   function updateOneInchAggregatorAddress(

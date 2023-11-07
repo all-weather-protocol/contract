@@ -25,6 +25,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - run: |
         yarn add -W @openzeppelin/contracts@4.7.3
+        yarn add -W @openzeppelin/hardhat-upgrades@2.3.3
         node .github/scripts/replaceStringForSlither.js        
 
     - name: Run Slither
