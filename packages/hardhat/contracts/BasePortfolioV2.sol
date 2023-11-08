@@ -44,6 +44,15 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     address receiver;
     ApolloXRedeemData apolloXRedeemData;
   }
+  struct ClaimData {
+    address receiver;
+    VaultClaimData apolloXClaimData;
+  }
+
+  struct VaultClaimData {
+    address tokenOut;
+    bytes aggregatorData;
+  }
 
   IERC20 public immutable asset;
   uint256 public balanceOfProtocolFee;
@@ -57,12 +66,13 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   mapping(address => mapping(string => mapping(address => uint256)))
     public userRewardPerTokenPaidPointerMapping;
 
-  // similar to userRewardPerTokenPaidPointerMapping, but this one is for the contract to know how much claimable rewards we can distribute to the user at this round, by thinking of `claimable - pointersOfEachClaimableReward` as allocatable rewards at this round. Will be reseted when someone trigger the `claim()` of that vault
+  // similar to userRewardPerTokenPaidPointerMapping, but this one is for the portfolio contract to know how much claimable rewards we can distribute to the user via `updateRewards()` at this round, by thinking of `claimable - pointersOfThisPortfolioForRecordingDistributedRewards` as allocatable rewards at this round. Will be reseted when someone trigger the `claim()` of that vault. If we don't have this pointer, we'll recalculate the reward amount of claimableRewards() every time someone triggers deposit(), redeem(), and claim(), resulting in an overestimate of rewardPerShareZappedIn.
   mapping(address => mapping(address => uint256))
-    public pointersOfEachClaimableReward;
+    public pointersOfThisPortfolioForRecordingDistributedRewards;
 
   mapping(string => mapping(address => uint256)) public rewardPerShareZappedIn;
   uint256 public constant UNIT_OF_SHARES = 1e10;
+  address public oneInchAggregatorAddress;
 
   constructor(
     address asset_,
@@ -70,6 +80,13 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     string memory symbol_
   ) ERC20(name_, symbol_) {
     asset = ERC20(asset_);
+  }
+
+  function updateOneInchAggregatorAddress(
+    address oneInchAggregatorAddress_
+  ) external onlyOwner {
+    require(oneInchAggregatorAddress_ != address(0), "Address cannot be zero");
+    oneInchAggregatorAddress = oneInchAggregatorAddress_;
   }
 
   function getVaults() external view returns (AbstractVaultV2[] memory) {
@@ -99,15 +116,15 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
         uint256 oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio = totalClaimableRewards[
             vaultIdx
           ].claimableRewards[rewardIdxOfThisVault].amount -
-            pointersOfEachClaimableReward[address(vaults[vaultIdx])][
-              addressOfReward
-            ];
-        pointersOfEachClaimableReward[address(vaults[vaultIdx])][
-          addressOfReward
-        ] = totalClaimableRewards[vaultIdx]
+            pointersOfThisPortfolioForRecordingDistributedRewards[
+              address(vaults[vaultIdx])
+            ][addressOfReward];
+        pointersOfThisPortfolioForRecordingDistributedRewards[
+          address(vaults[vaultIdx])
+        ][addressOfReward] = totalClaimableRewards[vaultIdx]
           .claimableRewards[rewardIdxOfThisVault]
           .amount;
-        _updateSpecificReward(
+        _updateUserSpecificReward(
           totalClaimableRewards[vaultIdx].protocol,
           addressOfReward,
           oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
@@ -239,12 +256,17 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     _burn(msg.sender, redeemData.amount);
   }
 
-  function claim(address payable receiver) external whenNotPaused nonReentrant {
-    _claim(receiver);
+  function claim(
+    ClaimData calldata claimData,
+    bool useDump
+  ) external whenNotPaused nonReentrant {
+    // this function is for `nonReentrant`
+    _claim(claimData, useDump);
   }
 
   function _claim(
-    address payable receiver
+    ClaimData calldata claimData,
+    bool useDump
   ) private whenNotPaused updateRewards {
     ClaimableRewardOfAProtocol[]
       memory totalClaimableRewards = getClaimableRewards(payable(msg.sender));
@@ -260,37 +282,129 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     ) {
       string memory protocolNameOfThisVault = totalClaimableRewards[vaultIdx]
         .protocol;
-      try vaults[vaultIdx].claim() {
-        for (
-          uint256 rewardIdxOfThisVault = 0;
-          rewardIdxOfThisVault <
-          totalClaimableRewards[vaultIdx].claimableRewards.length;
-          rewardIdxOfThisVault++
-        ) {
-          pointersOfEachClaimableReward[address(vaults[vaultIdx])][
-            totalClaimableRewards[vaultIdx]
-              .claimableRewards[rewardIdxOfThisVault]
-              .token
-          ] = 0;
-          address addressOfReward = totalClaimableRewards[vaultIdx]
-            .claimableRewards[rewardIdxOfThisVault]
-            .token;
-          SafeERC20.safeTransfer(
-            IERC20(addressOfReward),
-            receiver,
-            userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
-              addressOfReward
-            ]
-          );
-          userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
-            addressOfReward
-          ] = 0;
-        }
-      } catch Error(string memory _errorMessage) {
-        emit ClaimError(_errorMessage);
-        continue;
+      bytes32 bytesOfvaultName = keccak256(bytes(protocolNameOfThisVault));
+      if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
+        // slither-disable-next-line calls-loop
+        _claimAllTheRewardsInThisVault(
+          vaultIdx,
+          totalClaimableRewards,
+          protocolNameOfThisVault,
+          claimData.apolloXClaimData,
+          useDump,
+          claimData.receiver
+        );
+      } else {
+        revert(
+          string(abi.encodePacked("Unknow Vault:", protocolNameOfThisVault))
+        );
       }
     }
+  }
+
+  function _claimAllTheRewardsInThisVault(
+    uint256 vaultIdx,
+    ClaimableRewardOfAProtocol[] memory totalClaimableRewards,
+    string memory protocolNameOfThisVault,
+    VaultClaimData calldata valutClaimData,
+    bool useDump,
+    address receiver
+  ) internal {
+    try vaults[vaultIdx].claim() {
+      for (
+        uint256 rewardIdxOfThisVault = 0;
+        rewardIdxOfThisVault <
+        totalClaimableRewards[vaultIdx].claimableRewards.length;
+        rewardIdxOfThisVault++
+      ) {
+        address addressOfReward = totalClaimableRewards[vaultIdx]
+          .claimableRewards[rewardIdxOfThisVault]
+          .token;
+        _transferReward(
+          addressOfReward,
+          valutClaimData,
+          protocolNameOfThisVault,
+          useDump,
+          receiver
+        );
+        _resetUserRewardsOfInvestedProtocols(
+          address(vaults[vaultIdx]),
+          vaultIdx,
+          rewardIdxOfThisVault,
+          protocolNameOfThisVault,
+          addressOfReward
+        );
+      }
+    } catch Error(string memory _errorMessage) {
+      emit ClaimError(_errorMessage);
+    }
+  }
+
+  function _transferReward(
+    address addressOfReward,
+    VaultClaimData calldata valutClaimData,
+    string memory protocolNameOfThisVault,
+    bool useDump,
+    address receiver
+  ) internal {
+    IERC20 rewardToken = IERC20(addressOfReward);
+    if (useDump == false) {
+      SafeERC20.safeTransfer(
+        rewardToken,
+        receiver,
+        userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
+          addressOfReward
+        ]
+      );
+    } else {
+      uint256 swappedAmount = _dump(rewardToken, valutClaimData.aggregatorData);
+      SafeERC20.safeTransfer(
+        IERC20(valutClaimData.tokenOut),
+        receiver,
+        swappedAmount
+      );
+    }
+  }
+
+  function _dump(
+    IERC20 rewardToken,
+    bytes calldata aggregatorData
+  ) public returns (uint256) {
+    uint256 currentAllowance = rewardToken.allowance(
+      address(this),
+      oneInchAggregatorAddress
+    );
+    if (currentAllowance > 0) {
+      SafeERC20.safeApprove(rewardToken, oneInchAggregatorAddress, 0);
+    }
+    SafeERC20.safeApprove(
+      rewardToken,
+      oneInchAggregatorAddress,
+      rewardToken.balanceOf(address(this))
+    );
+    // slither-disable-next-line low-level-calls
+    (bool succ, bytes memory data) = address(oneInchAggregatorAddress).call(
+      aggregatorData
+    );
+    require(
+      succ,
+      "Aggregator failed to swap, please update your block_number when running hardhat test"
+    );
+    return abi.decode(data, (uint256));
+  }
+
+  function _resetUserRewardsOfInvestedProtocols(
+    address vaultAddress,
+    uint256 vaultIdx,
+    uint256 rewardIdxOfThisVault,
+    string memory protocolNameOfThisVault,
+    address addressOfReward
+  ) internal {
+    pointersOfThisPortfolioForRecordingDistributedRewards[vaultAddress][
+      addressOfReward
+    ] = 0;
+    userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
+      addressOfReward
+    ] = 0;
   }
 
   function getClaimableRewards(
@@ -386,7 +500,7 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     return rewardAmount;
   }
 
-  function _updateSpecificReward(
+  function _updateUserSpecificReward(
     string memory protocolNameOfThisVault,
     address addressOfReward,
     uint256 oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio

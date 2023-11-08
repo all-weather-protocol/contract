@@ -8,6 +8,7 @@ config();
 // wallets
 const myImpersonatedWalletAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const myImpersonatedWalletAddress2 = "0x2170Ed0880ac9A755fd29B2688956BD959F933F8";
+const oneInchBscAddress = '0x1111111254eeb25477b68fb85ed929f73a960582';
 const end2endTestingStableCointAmount = ethers.parseUnits('50', 18);
 const gasLimit = 30000000;
 
@@ -61,11 +62,14 @@ async function deployContracts(allocations, deployer, wallet2) {
   await portfolioContract.waitForDeployment();
 
   await portfolioContract.setVaultAllocations(allocations).then((tx) => tx.wait());
+  await portfolioContract.updateOneInchAggregatorAddress(oneInchBscAddress).then((tx) => tx.wait());
   await _checkAllcation(allocations, portfolioContract);
 
+  // some token chores and initilization top up
   await (await USDC.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
   await (await ALP.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
-
+  // send BNB to portfolioContract for gas fee
+  await (await deployer.sendTransaction({ to: portfolioContract.target, value: ethers.parseEther("1"), gasLimit:30000000 })).wait();
   return {
     portfolioContract, 
     apolloxBscVault};
@@ -95,6 +99,19 @@ async function deposit(end2endTestingStableCointAmount, wallet, portfolioContrac
   return await (await portfolioContract.connect(deployer).deposit(depositData, { gasLimit: 30000000 })).wait();
 }
 
+async function claim(walletAddress, deployer, amount, portfolioContract) {
+  const { APX, USDC } = await initTokens();
+  const claimData = {
+    receiver: walletAddress,
+    apolloXClaimData: {
+      tokenOut: USDC.target,
+      aggregatorData: _getAggregatorData("ApolloX-ALP", 56, APX.target, USDC.target, amount, portfolioContract.target),
+    }
+  }
+  const useDump = true;
+  return await (await portfolioContract.connect(deployer).claim(claimData, useDump, { gasLimit: 30000000 })).wait();
+}
+
 // radiant has an one year lock, therefore need these timestamp-related variables
 let currentTimestamp = Math.floor(Date.now() / 1000);;
 async function simulateTimeElasped(timeElasped = 12 * 31 * 86400) {
@@ -110,7 +127,52 @@ async function mineBlocks(numBlocks) {
   }
 }
 
+async function _getAggregatorData(vaultName, chainID, tokenInAddress, tokenOutAddress, amount, vaultAddress) {
+  let aggregatorData;
+  try {
+    console.log("read 1inch calldata and pendle calldata from json file")
+    aggregatorData = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', `${vaultName}.json`), 'utf8'));
+  } catch (err) {
+    console.error('json file not found, get new 1inch calldata and pendle calldata');
+    [
+      aggregatorData,
+    ] = await Promise.all([
+      fetch1InchSwapData(chainID, tokenInAddress, tokenOutAddress, amount, vaultAddress, 50),
+    ]);
+    fs.writeFileSync(path.join(__dirname, 'fixtures', `${vaultName}.json`), JSON.stringify(aggregatorData, null, 2), 'utf8')
+  }
+  return aggregatorData.tx.data;
+}
 
+async function fetch1InchSwapData(chainID, fromTokenAddress, toTokenAddress, amount, fromAddress, slippage=50) {
+  const headers = {
+    'Authorization': `Bearer ${process.env['ONE_INCH_API_KEY']}`,
+    'accept': 'application/json'
+  };
+  const res = await got(`https://api.1inch.dev/swap/v5.2/${chainID}/swap?src=${fromTokenAddress}&dst=${toTokenAddress}&amount=${amount.toString()}&from=${fromAddress}&slippage=${slippage}&disableEstimate=true`, {
+    headers,
+    retry: {
+      limit: 1, // Number of retries
+      methods: ['GET'], // Retry only for GET requests
+      statusCodes: [429, 500, 502, 503, 504], // Retry for specific status codes
+      // calculateDelay: ({ attemptCount }) => attemptCount * 3000, // Delay between retries in milliseconds
+    }
+  })
+  if (res.statusCode !== 200) {
+    throw new Error(`HTTP error! status: ${res.statusCode}`);
+  }
+  return JSON.parse(res.body);
+}
+
+function isWithinPercentage(number, target, percent) {
+  // Convert BigInt to a regular number for calculation
+  const numberAsNumber = Number(number);
+  const targetAsNumber = Number(target);
+
+  const difference = Math.abs(numberAsNumber - targetAsNumber);
+  const allowedDifference = (percent / 100) * targetAsNumber;
+  return difference <= allowedDifference;
+}
 
 module.exports = {
     getBeforeEachSetUp,
@@ -119,5 +181,7 @@ module.exports = {
     end2endTestingStableCointAmount,
     gasLimit,
     mineBlocks,
-    simulateTimeElasped
+    simulateTimeElasped,
+    claim,
+    isWithinPercentage
 };

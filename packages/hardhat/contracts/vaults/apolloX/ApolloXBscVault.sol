@@ -27,8 +27,6 @@ contract ApolloXBscVault is AbstractVaultV2 {
   IERC20 public ALP;
   IERC20 public constant APX =
     IERC20(0x78F5d389F5CDCcFc41594aBaB4B0Ed02F31398b3);
-  IERC20 public constant USDC =
-    IERC20(0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d);
   uint256 public ratioAfterPerformanceFee;
   uint256 public denominator;
 
@@ -92,9 +90,6 @@ contract ApolloXBscVault is AbstractVaultV2 {
     ApolloXDepositData calldata apolloXDepositData
   ) internal override returns (uint256) {
     IERC20 tokenInERC20 = IERC20(apolloXDepositData.tokenIn);
-    if (apolloXDepositData.tokenIn != address(USDC)) {
-      revert("Only USDC is supported for now");
-    }
     uint256 currentAllowance = tokenInERC20.allowance(
       address(this),
       address(apolloX)
