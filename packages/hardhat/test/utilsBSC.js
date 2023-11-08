@@ -17,25 +17,21 @@ async function initTokens() {
     const ApolloX = await ethers.getContractAt("IApolloX", "0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0");
     const USDC = await ethers.getContractAt('IERC20', "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
     const APX = await ethers.getContractAt('IERC20', "0x78F5d389F5CDCcFc41594aBaB4B0Ed02F31398b3");
+    const USDT = await ethers.getContractAt('IERC20', "0x55d398326f99059fF775485246999027B3197955");
     return {
         ALP,
         USDC,
         ApolloX,
-        APX
+        APX,
+        USDT
     }
 }
 async function getBeforeEachSetUp(allocations) {
   const wallet = await ethers.getImpersonatedSigner(myImpersonatedWalletAddress);
   const wallet2 = await ethers.getImpersonatedSigner(myImpersonatedWalletAddress2);
   const deployer = wallet;
-// await weth.connect(wallet).deposit({ value: ethers.utils.parseEther("1"), gasLimit });
-// await weth.connect(wallet2).deposit({ value: ethers.utils.parseEther("0.1"), gasLimit });
     
   const contracts = await deployContracts(allocations, deployer, wallet2);
-
-//   await (await weth.connect(wallet2).approve(portfolioContract.target, ethers.constants.MaxUint256, { gasLimit })).wait();
-
-//   portfolioShares = amountAfterChargingFee.div(await portfolioContract.UNIT_OF_SHARES());
   return {
     contracts,
     wallet,
@@ -58,7 +54,7 @@ async function deployContracts(allocations, deployer, wallet2) {
   await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10);
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
-  const portfolioContract = await StableCoinVaultFactory.connect(deployer).deploy(USDC.target, "StableCoinLP", "SCLP", apolloxBscVault.target, {gasLimit:30000000});
+  const portfolioContract = await StableCoinVaultFactory.connect(deployer).deploy("StableCoinLP", "SCLP", apolloxBscVault.target, {gasLimit:30000000});
   await portfolioContract.waitForDeployment();
 
   await portfolioContract.setVaultAllocations(allocations).then((tx) => tx.wait());
@@ -90,10 +86,20 @@ async function deployContractsToChain(wallet, allocations, portfolioContractName
   return await deployContracts(wallet, dpxSLP, sushiMiniChefV2Address, sushiPid, oneInchAddress, pendleGlpMarketLPT, pendleGDAIMarketLPT, pendleRETHMarketLPT, radiantLendingPoolAddress, eqbMinterAddress, pendleBoosterAddress, allocations, portfolioContractName);
 }
 
-async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract, apolloXDepositData) {
+async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract) {
+  const { USDC, USDT } = await initTokens();
+  const apolloXDepositData = {
+    tokenIn: USDT.target,
+    // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
+    minALP: ethers.parseEther("50")/ BigInt(12) * BigInt(10)
+  }
+
   const depositData = {
     amount: end2endTestingStableCointAmount,
     receiver: wallet.address,
+    tokenIn: USDC.target,
+    tokenInAfterSwap: USDT.target,
+    aggregatorData: _getAggregatorData("ApolloX-ALP-deposit", 56, USDC.target, USDT.target, end2endTestingStableCointAmount, portfolioContract.target),
     apolloXDepositData
   }
   return await (await portfolioContract.connect(deployer).deposit(depositData, { gasLimit: 30000000 })).wait();

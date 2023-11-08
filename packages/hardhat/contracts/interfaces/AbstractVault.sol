@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.18;
+pragma solidity 0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "../3rd/radiant/IFeeDistribution.sol";
 import "../utils/IWETH.sol";
 import "../3rd/pendle/IPendleRouter.sol";
 
 abstract contract AbstractVault is ERC4626, Ownable {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
 
   address public oneInchAggregatorAddress;
   IWETH public constant WETH =

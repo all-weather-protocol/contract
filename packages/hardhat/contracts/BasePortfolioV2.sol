@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.18;
+pragma solidity 0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./3rd/radiant/IFeeDistribution.sol";
 import "./3rd/pendle/IPendleRouter.sol";
 import "./interfaces/AbstractVaultV2.sol";
@@ -17,7 +17,7 @@ import "./vaults/apolloX/ApolloXRedeemData.sol";
 
 abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
+
   event ClaimError(string errorMessage);
 
   struct PortfolioAllocationOfSingleCategory {
@@ -37,6 +37,9 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   struct DepositData {
     uint256 amount;
     address receiver;
+    address tokenIn;
+    address tokenInAfterSwap;
+    bytes aggregatorData;
     ApolloXDepositData apolloXDepositData;
   }
   struct RedeemData {
@@ -54,7 +57,6 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     bytes aggregatorData;
   }
 
-  IERC20 public immutable asset;
   uint256 public balanceOfProtocolFee;
 
   mapping(string => uint256) public portfolioAllocation;
@@ -75,12 +77,9 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   address public oneInchAggregatorAddress;
 
   constructor(
-    address asset_,
     string memory name_,
     string memory symbol_
-  ) ERC20(name_, symbol_) {
-    asset = ERC20(asset_);
-  }
+  ) ERC20(name_, symbol_) Ownable(msg.sender) {}
 
   function updateOneInchAggregatorAddress(
     address oneInchAggregatorAddress_
@@ -175,57 +174,16 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     require(depositData.amount > 0, "amount must > 0");
 
     // Transfer tokens from the user to the contract
-    SafeERC20.safeTransferFrom(
-      IERC20(asset),
-      msg.sender,
-      address(this),
-      depositData.amount
+    (
+      address addressOfTokenForDiversification,
+      uint256 amountOfTokenForDiversification
+    ) = _getToken(depositData);
+    uint256 portfolioSharesToBeMinted = _diversify(
+      depositData,
+      addressOfTokenForDiversification,
+      amountOfTokenForDiversification
     );
-    uint256 portfolioSharesToBeMinted = 0;
-    for (uint256 idx = 0; idx < vaults.length; idx++) {
-      // slither-disable-next-line calls-loop
-      string memory nameOfThisVault = vaults[idx].name();
-      bytes32 bytesOfvaultName = keccak256(bytes(nameOfThisVault));
-      uint256 zapInAmountForThisVault = Math.mulDiv(
-        depositData.amount,
-        portfolioAllocation[nameOfThisVault],
-        100
-      );
-      // slither-disable-next-line incorrect-equality
-      if (zapInAmountForThisVault == 0) {
-        continue;
-      }
-      uint256 currentAllowance = IERC20(asset).allowance(
-        address(this),
-        address(vaults[idx])
-      );
-      if (currentAllowance > 0) {
-        SafeERC20.safeApprove(IERC20(asset), address(vaults[idx]), 0);
-      }
-      SafeERC20.safeApprove(
-        IERC20(asset),
-        address(vaults[idx]),
-        zapInAmountForThisVault
-      );
-
-      if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
-        // slither-disable-next-line calls-loop
-        portfolioSharesToBeMinted = vaults[idx].deposit(
-          zapInAmountForThisVault,
-          depositData.apolloXDepositData
-        );
-        require(
-          portfolioSharesToBeMinted > 0,
-          "Buying ApolloX-ALP token failed"
-        );
-      } else {
-        revert(string(abi.encodePacked("Unknow Vault:", nameOfThisVault)));
-      }
-    }
-
-    uint256 shares = SafeMath.div(portfolioSharesToBeMinted, UNIT_OF_SHARES);
-    require(shares > 0, "Shares must > 0");
-    _mint(depositData.receiver, shares);
+    _mintShares(depositData, portfolioSharesToBeMinted);
   }
 
   function redeem(
@@ -245,11 +203,23 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
             vaultShares,
             redeemData.apolloXRedeemData
           );
-          SafeERC20.safeTransfer(
-            IERC20(redeemData.apolloXRedeemData.tokenOut),
-            redeemData.receiver,
-            redeemAmount
-          );
+          if (redeemData.apolloXRedeemData.aggregatorData.length > 0) {
+            uint256 swappedAmount = _swap(
+              IERC20(redeemData.apolloXRedeemData.alpTokenOut),
+              redeemData.apolloXRedeemData.aggregatorData
+            );
+            SafeERC20.safeTransfer(
+              IERC20(redeemData.apolloXRedeemData.tokenOut),
+              redeemData.receiver,
+              swappedAmount
+            );
+          } else {
+            SafeERC20.safeTransfer(
+              IERC20(redeemData.apolloXRedeemData.alpTokenOut),
+              redeemData.receiver,
+              redeemAmount
+            );
+          }
         }
       }
     }
@@ -356,7 +326,7 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
         ]
       );
     } else {
-      uint256 swappedAmount = _dump(rewardToken, valutClaimData.aggregatorData);
+      uint256 swappedAmount = _swap(rewardToken, valutClaimData.aggregatorData);
       SafeERC20.safeTransfer(
         IERC20(valutClaimData.tokenOut),
         receiver,
@@ -365,18 +335,85 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     }
   }
 
-  function _dump(
+  function _getToken(
+    DepositData calldata depositData
+  ) internal returns (address, uint256) {
+    SafeERC20.safeTransferFrom(
+      IERC20(depositData.tokenIn),
+      msg.sender,
+      address(this),
+      depositData.amount
+    );
+    if (depositData.aggregatorData.length > 0) {
+      return (
+        depositData.tokenInAfterSwap,
+        _swap(IERC20(depositData.tokenIn), depositData.aggregatorData)
+      );
+    }
+    return (depositData.tokenIn, depositData.amount);
+  }
+
+  function _diversify(
+    DepositData calldata depositData,
+    address addressOfTokenForDiversification,
+    uint256 amountOfTokenForDiversification
+  ) internal returns (uint256) {
+    uint256 portfolioSharesToBeMinted = 0;
+    for (uint256 idx = 0; idx < vaults.length; idx++) {
+      // slither-disable-next-line calls-loop
+      string memory nameOfThisVault = vaults[idx].name();
+      bytes32 bytesOfvaultName = keccak256(bytes(nameOfThisVault));
+      uint256 zapInAmountForThisVault = Math.mulDiv(
+        amountOfTokenForDiversification,
+        portfolioAllocation[nameOfThisVault],
+        100
+      );
+      // slither-disable-next-line incorrect-equality
+      if (zapInAmountForThisVault == 0) {
+        continue;
+      }
+      SafeERC20.forceApprove(
+        IERC20(addressOfTokenForDiversification),
+        address(vaults[idx]),
+        zapInAmountForThisVault
+      );
+
+      if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
+        // slither-disable-next-line calls-loop
+        portfolioSharesToBeMinted = vaults[idx].deposit(
+          zapInAmountForThisVault,
+          depositData.tokenInAfterSwap,
+          depositData.apolloXDepositData
+        );
+        require(
+          portfolioSharesToBeMinted > 0,
+          "Buying ApolloX-ALP token failed"
+        );
+      } else {
+        revert(string(abi.encodePacked("Unknow Vault:", nameOfThisVault)));
+      }
+    }
+    return portfolioSharesToBeMinted;
+  }
+
+  function _mintShares(
+    DepositData calldata depositData,
+    uint256 portfolioSharesToBeMinted
+  ) internal {
+    (bool succ, uint256 shares) = Math.tryDiv(
+      portfolioSharesToBeMinted,
+      UNIT_OF_SHARES
+    );
+    require(succ, "Division failed");
+    require(shares > 0, "Shares must > 0");
+    _mint(depositData.receiver, shares);
+  }
+
+  function _swap(
     IERC20 rewardToken,
     bytes calldata aggregatorData
   ) public returns (uint256) {
-    uint256 currentAllowance = rewardToken.allowance(
-      address(this),
-      oneInchAggregatorAddress
-    );
-    if (currentAllowance > 0) {
-      SafeERC20.safeApprove(rewardToken, oneInchAggregatorAddress, 0);
-    }
-    SafeERC20.safeApprove(
+    SafeERC20.forceApprove(
       rewardToken,
       oneInchAggregatorAddress,
       rewardToken.balanceOf(address(this))
@@ -541,11 +578,12 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     if (totalSupply() == 0) {
       return 0;
     }
-    return
-      SafeMath.div(
-        oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio,
-        totalSupply()
-      );
+    (bool succ, uint256 rewardPerShare) = Math.tryDiv(
+      oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio,
+      totalSupply()
+    );
+    require(succ, "Division failed");
+    return rewardPerShare;
   }
 
   // solhint-disable-next-line no-empty-blocks

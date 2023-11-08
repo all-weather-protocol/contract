@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.18;
+pragma solidity 0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -11,7 +11,6 @@ import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC2
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
-
 import "../3rd/radiant/IFeeDistribution.sol";
 import "../3rd/pendle/IPendleRouter.sol";
 import "../vaults/apolloX/ApolloXDepositData.sol";
@@ -25,7 +24,6 @@ abstract contract AbstractVaultV2 is
   PausableUpgradeable
 {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
 
   address public oneInchAggregatorAddress;
 
@@ -79,9 +77,10 @@ abstract contract AbstractVaultV2 is
 
   function deposit(
     uint256 amount,
+    address tokenInAfterSwap,
     ApolloXDepositData calldata apolloXDepositData
   ) public virtual returns (uint256) {
-    _prepareForDeposit(amount, apolloXDepositData.tokenIn);
+    _prepareForDeposit(amount, tokenInAfterSwap);
     uint256 shares = _zapIn(amount, apolloXDepositData);
     return _mintShares(shares, amount);
   }

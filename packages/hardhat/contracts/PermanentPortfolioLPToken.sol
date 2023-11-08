@@ -7,7 +7,7 @@
 // claim: Takes in an account and reward tokens, and claims all the available rewards across both protocols, sending them to the account.
 // The code imports several open source libraries and uses various data structures like struct, bytes, and mapping. The SPDX-License-Identifier specifies the license for the code (MIT in this case).
 
-pragma solidity 0.8.18;
+pragma solidity 0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./vaults/sushiswap/MagicArbitrumVault.sol";
 import "./vaults/equilibria/EquilibriaGlpVault.sol";
@@ -19,7 +19,6 @@ import "./BasePortfolio.sol";
 
 contract PermanentPortfolioLPToken is BasePortfolio {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
 
   constructor(
     address asset_,

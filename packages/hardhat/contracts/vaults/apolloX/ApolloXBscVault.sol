@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.18;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -18,7 +18,6 @@ import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/int
 
 contract ApolloXBscVault is AbstractVaultV2 {
   using SafeERC20 for IERC20;
-  using Math for uint256;
 
   error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
   event WithdrawFailed(address token);
@@ -90,16 +89,8 @@ contract ApolloXBscVault is AbstractVaultV2 {
     ApolloXDepositData calldata apolloXDepositData
   ) internal override returns (uint256) {
     IERC20 tokenInERC20 = IERC20(apolloXDepositData.tokenIn);
-    uint256 currentAllowance = tokenInERC20.allowance(
-      address(this),
-      address(apolloX)
-    );
-    if (currentAllowance > 0) {
-      SafeERC20.safeApprove(tokenInERC20, address(apolloX), 0);
-      SafeERC20.safeApprove(ALP, address(apolloX), 0);
-    }
-    SafeERC20.safeApprove(tokenInERC20, address(apolloX), amount);
-    SafeERC20.safeApprove(ALP, address(apolloX), amount);
+    SafeERC20.forceApprove(tokenInERC20, address(apolloX), amount);
+    SafeERC20.forceApprove(ALP, address(apolloX), amount);
     uint256 originalStakeOf = apolloX.stakeOf(address(this));
     apolloX.mintAlp(
       address(tokenInERC20),
@@ -124,24 +115,20 @@ contract ApolloXBscVault is AbstractVaultV2 {
     _burn(msg.sender, shares);
 
     apolloX.unStake(shares);
-    uint256 currentAllowance = ALP.allowance(address(this), address(apolloX));
-    if (currentAllowance > 0) {
-      SafeERC20.safeApprove(ALP, address(apolloX), 0);
-    }
-    SafeERC20.safeApprove(ALP, address(apolloX), shares);
-    uint256 originalTokenOutBalance = IERC20(apolloXRedeemData.tokenOut)
+    SafeERC20.forceApprove(ALP, address(apolloX), shares);
+    uint256 originalTokenOutBalance = IERC20(apolloXRedeemData.alpTokenOut)
       .balanceOf(address(this));
     apolloX.burnAlp(
-      apolloXRedeemData.tokenOut,
+      apolloXRedeemData.alpTokenOut,
       shares,
       apolloXRedeemData.minOut,
       address(this)
     );
-    uint256 currentTokenOutBalance = IERC20(apolloXRedeemData.tokenOut)
+    uint256 currentTokenOutBalance = IERC20(apolloXRedeemData.alpTokenOut)
       .balanceOf(address(this));
     uint256 redeemAmount = currentTokenOutBalance - originalTokenOutBalance;
     SafeERC20.safeTransfer(
-      IERC20(apolloXRedeemData.tokenOut),
+      IERC20(apolloXRedeemData.alpTokenOut),
       msg.sender,
       redeemAmount
     );

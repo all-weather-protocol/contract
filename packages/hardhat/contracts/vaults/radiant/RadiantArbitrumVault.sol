@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.18;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import "../../3rd/radiant/ILendingPool.sol";
@@ -18,7 +18,6 @@ import "../../interfaces/AbstractVault.sol";
 
 contract RadiantArbitrumVault is AbstractVault {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
 
   event WithdrawFailed(address token);
 
@@ -38,7 +37,11 @@ contract RadiantArbitrumVault is AbstractVault {
   constructor(
     IERC20Metadata asset_,
     address radiantLending_
-  ) ERC4626(asset_) ERC20("RadiantArbitrum-DLP", "ALP-ra-dlp") {
+  )
+    ERC4626(asset_)
+    ERC20("RadiantArbitrum-DLP", "ALP-ra-dlp")
+    Ownable(msg.sender)
+  {
     radiantLending = ILendingPool(radiantLending_);
     lockZap = ILockZap(0x8991C4C347420E476F1cf09C03abA224A76E2997);
   }
@@ -75,9 +78,9 @@ contract RadiantArbitrumVault is AbstractVault {
   function _zapIn(uint256 amount) internal override returns (uint256) {
     uint256 currentAllowance = WETH.allowance(address(this), address(lockZap));
     if (currentAllowance > 0) {
-      SafeERC20.safeApprove(WETH, address(lockZap), 0);
+      SafeERC20.forceApprove(WETH, address(lockZap), 0);
     }
-    SafeERC20.safeApprove(WETH, address(lockZap), amount);
+    SafeERC20.forceApprove(WETH, address(lockZap), amount);
     uint256 shares = lockZap.zap(false, amount, 0, 3);
     return shares;
   }

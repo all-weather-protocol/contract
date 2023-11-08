@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.18;
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+pragma solidity 0.8.20;
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./BaseEquilibriaVault.sol";
 
 contract EquilibriaGDAIVault is BaseEquilibriaVault {
@@ -34,9 +34,9 @@ contract EquilibriaGDAIVault is BaseEquilibriaVault {
       oneInchAggregatorAddress
     );
     if (currentAllowance > 0) {
-      SafeERC20.safeApprove(WETH, oneInchAggregatorAddress, 0);
+      SafeERC20.forceApprove(WETH, oneInchAggregatorAddress, 0);
     }
-    SafeERC20.safeApprove(WETH, oneInchAggregatorAddress, amount);
+    SafeERC20.forceApprove(WETH, oneInchAggregatorAddress, amount);
     // slither-disable-next-line low-level-calls
     (bool succ, bytes memory data) = address(oneInchAggregatorAddress).call(
       oneInchData

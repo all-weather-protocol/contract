@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.18;
+pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../interfaces/AbstractVault.sol";
 import "../../3rd/equilibria/IEqbZap.sol";
@@ -19,7 +19,6 @@ import "../../3rd/pendle/IPendleBooster.sol";
 
 abstract contract BaseEquilibriaVault is AbstractVault {
   using SafeERC20 for IERC20;
-  using SafeMath for uint256;
 
   IEqbZap public immutable eqbZap;
   IPendleBooster public immutable pendleBooster;
@@ -38,7 +37,7 @@ abstract contract BaseEquilibriaVault is AbstractVault {
     IERC20Metadata asset_,
     string memory name_,
     string memory symbol_
-  ) ERC4626(asset_) ERC20(name_, symbol_) {
+  ) ERC4626(asset_) ERC20(name_, symbol_) Ownable(msg.sender) {
     eqbZap = IEqbZap(0xc7517f481Cc0a645e63f870830A4B2e580421e32);
     pendleBooster = IPendleBooster(0x4D32C8Ff2fACC771eC7Efc70d6A8468bC30C26bF);
   }
@@ -100,13 +99,18 @@ abstract contract BaseEquilibriaVault is AbstractVault {
       address(eqbZap)
     );
     if (currentAllowance > 0) {
-      SafeERC20.safeApprove(zapInToken, address(eqbZap), 0);
+      SafeERC20.forceApprove(zapInToken, address(eqbZap), 0);
     }
-    SafeERC20.safeApprove(zapInToken, address(eqbZap), amount);
+    SafeERC20.forceApprove(zapInToken, address(eqbZap), amount);
     // Error: VM Exception while processing transaction: reverted with an unrecognized custom error (return data: 0xfa711db2)
     // It means the swap would exceed the max slippage
     eqbZap.zapIn(pid, minLpOut, guessPtReceivedFromSy, input, true);
-    return totalStakedButWithoutLockedAssets().sub(originalShares);
+    (bool succ, uint256 result) = Math.trySub(
+      totalStakedButWithoutLockedAssets(),
+      originalShares
+    );
+    require(succ, "Subtraction failed");
+    return result;
   }
 
   function redeem(uint256 shares) public override {
@@ -116,13 +120,13 @@ abstract contract BaseEquilibriaVault is AbstractVault {
       .stakingToken()
       .allowance(address(this), address(eqbZap));
     if (currentAllowance > 0) {
-      SafeERC20.safeApprove(
+      SafeERC20.forceApprove(
         IBaseRewardPool(rewardPool).stakingToken(),
         address(eqbZap),
         0
       );
     }
-    SafeERC20.safeApprove(
+    SafeERC20.forceApprove(
       IBaseRewardPool(rewardPool).stakingToken(),
       address(eqbZap),
       shares
