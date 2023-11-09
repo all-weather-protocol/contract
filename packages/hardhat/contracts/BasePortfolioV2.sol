@@ -190,8 +190,13 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
           address desiredTokenOut,
           bytes memory aggregatorData
         ) = vaults[i].redeem(vaultShares, redeemData);
-        // test case should fail if this one is commented!
-        // _returnRedeemInDesiredTokenToUser(redeemData.receiver, redeemAmount, tokenOutFromRedeem, desiredTokenOut, aggregatorData);
+        _returnRedeemInDesiredTokenToUser(
+          redeemData.receiver,
+          redeemAmount,
+          tokenOutFromRedeem,
+          desiredTokenOut,
+          aggregatorData
+        );
       }
     }
     _burn(msg.sender, redeemData.amount);

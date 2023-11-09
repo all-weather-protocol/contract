@@ -53,6 +53,7 @@ describe("All Weather Protocol", function () {
       await simulateTimeElasped(86400*2); // there's a 1-day constraint for redeeming ALP
 
       const shares = contracts.portfolioContract.balanceOf(wallet.address);
+      const originalTokenOutBalance = await USDC.balanceOf(wallet.address);
       await contracts.portfolioContract.connect(wallet).redeem({
         amount: shares,
         receiver: wallet.address,
@@ -63,6 +64,8 @@ describe("All Weather Protocol", function () {
           aggregatorData: ethers.toUtf8Bytes('')
         }
       }, { gasLimit });
+      const currentTokenOutBalance = await USDC.balanceOf(wallet.address);
+      expect(isWithinPercentage(currentTokenOutBalance-originalTokenOutBalance, 9950762154937376252n, 0.1)).to.be.true;
     })
     it("Should be able to check claimable rewards", async function () {
       const claimableRewards = await contracts.portfolioContract.getClaimableRewards(wallet.address);
