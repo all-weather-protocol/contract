@@ -298,8 +298,6 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
         );
         _resetUserRewardsOfInvestedProtocols(
           address(vaults[vaultIdx]),
-          vaultIdx,
-          rewardIdxOfThisVault,
           protocolNameOfThisVault,
           addressOfReward
         );
@@ -431,8 +429,6 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
 
   function _resetUserRewardsOfInvestedProtocols(
     address vaultAddress,
-    uint256 vaultIdx,
-    uint256 rewardIdxOfThisVault,
     string memory protocolNameOfThisVault,
     address addressOfReward
   ) internal {

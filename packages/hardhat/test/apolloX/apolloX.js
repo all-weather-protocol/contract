@@ -31,7 +31,7 @@ describe("All Weather Protocol", function () {
   describe("ApolloX Contract Test", function () {
     it("Should be able to mint ALP with USDC", async function () {
       this.timeout(240000); // Set timeout to 120 seconds
-      const receipt = await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract);
+      const receipt = await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "apollox-mint-alp");
       // Iterate over the events and find the Deposit event
       for (const event of receipt.logs) {
         if (event.eventName === 'Transfer' && event.args[1] === contracts.apolloxBscVault.target && event.args[0] === '0x0000000000000000000000000000000000000000') {
@@ -40,7 +40,7 @@ describe("All Weather Protocol", function () {
             expect((await contracts.apolloxBscVault.totalAssets())).to.equal(shares);
 
             // at the time of writing, the price of ALP is 1.1175, so 100 USDC should be able to mint 89.307284980382532996 ALP
-            expect(isWithinPercentage(await contracts.portfolioContract.balanceOf(wallet.address), 4412258408n, 0.1)).to.be.true;
+            expect(isWithinPercentage(await contracts.portfolioContract.balanceOf(wallet.address), 882513751n, 0.1)).to.be.true;
             expect((await ApolloX.stakeOf(contracts.apolloxBscVault.target))).to.equal(shares);
           }
         }
@@ -48,7 +48,7 @@ describe("All Weather Protocol", function () {
     );
     it("Should be able to burn ALP and redeem to USDC", async function () {
       this.timeout(240000); // Set timeout to 120 seconds
-      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract);
+      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "apollox-redeem-alp");
       await simulateTimeElasped(86400*2); // there's a 1-day constraint for redeeming ALP
 
       const shares = contracts.portfolioContract.balanceOf(wallet.address);
@@ -57,7 +57,7 @@ describe("All Weather Protocol", function () {
         receiver: wallet.address,
         apolloXRedeemData: {
           alpTokenOut: USDC.target,
-          minOut: ethers.parseEther("49"),
+          minOut: ethers.parseEther("9"),
           tokenOut: USDC.target,
           aggregatorData: ethers.toUtf8Bytes('')
         }
@@ -68,10 +68,10 @@ describe("All Weather Protocol", function () {
       for (const protocol of claimableRewards) {
         expect(protocol.claimableRewards).to.deep.equal([]);
       }
-      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract);
+      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "apollox-check-alp-reward");
       await mineBlocks(100);
       const newClaimableRewards = await contracts.portfolioContract.getClaimableRewards(wallet.address);
-      expect(isWithinPercentage(newClaimableRewards[0].claimableRewards[0].amount, 748680831186256n, 0.1)).to.be.true;
+      expect(isWithinPercentage(newClaimableRewards[0].claimableRewards[0].amount, 149747573175198n, 0.1)).to.be.true;
     })
   });
 });

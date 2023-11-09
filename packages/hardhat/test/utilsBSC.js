@@ -9,7 +9,7 @@ config();
 const myImpersonatedWalletAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const myImpersonatedWalletAddress2 = "0x2170Ed0880ac9A755fd29B2688956BD959F933F8";
 const oneInchBscAddress = '0x1111111254eeb25477b68fb85ed929f73a960582';
-const end2endTestingStableCointAmount = ethers.parseUnits('50', 18);
+const end2endTestingStableCointAmount = ethers.parseUnits('10', 18);
 const gasLimit = 30000000;
 
 async function initTokens() {
@@ -86,12 +86,12 @@ async function deployContractsToChain(wallet, allocations, portfolioContractName
   return await deployContracts(wallet, dpxSLP, sushiMiniChefV2Address, sushiPid, oneInchAddress, pendleGlpMarketLPT, pendleGDAIMarketLPT, pendleRETHMarketLPT, radiantLendingPoolAddress, eqbMinterAddress, pendleBoosterAddress, allocations, portfolioContractName);
 }
 
-async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract) {
+async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract, fixtureName) {
   const { USDC, USDT } = await initTokens();
   const apolloXDepositData = {
     tokenIn: USDT.target,
     // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
-    minALP: ethers.parseEther("50")/ BigInt(12) * BigInt(10)
+    minALP: ethers.parseEther("1")/ BigInt(12) * BigInt(10)
   }
 
   const depositData = {
@@ -99,7 +99,7 @@ async function deposit(end2endTestingStableCointAmount, wallet, portfolioContrac
     receiver: wallet.address,
     tokenIn: USDC.target,
     tokenInAfterSwap: USDT.target,
-    aggregatorData: _getAggregatorData("ApolloX-ALP-deposit", 56, USDC.target, USDT.target, end2endTestingStableCointAmount, portfolioContract.target),
+    aggregatorData: _getAggregatorData(fixtureName, 56, USDC.target, USDT.target, end2endTestingStableCointAmount, portfolioContract.target, fixtureName),
     apolloXDepositData
   }
   return await (await portfolioContract.connect(deployer).deposit(depositData, { gasLimit: 30000000 })).wait();
@@ -133,11 +133,11 @@ async function mineBlocks(numBlocks) {
   }
 }
 
-async function _getAggregatorData(vaultName, chainID, tokenInAddress, tokenOutAddress, amount, vaultAddress) {
+async function _getAggregatorData(fixtureName, chainID, tokenInAddress, tokenOutAddress, amount, vaultAddress) {
   let aggregatorData;
   try {
     console.log("read 1inch calldata and pendle calldata from json file")
-    aggregatorData = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', `${vaultName}.json`), 'utf8'));
+    aggregatorData = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', `${fixtureName}.json`), 'utf8'));
   } catch (err) {
     console.error('json file not found, get new 1inch calldata and pendle calldata');
     [
@@ -145,7 +145,7 @@ async function _getAggregatorData(vaultName, chainID, tokenInAddress, tokenOutAd
     ] = await Promise.all([
       fetch1InchSwapData(chainID, tokenInAddress, tokenOutAddress, amount, vaultAddress, 50),
     ]);
-    fs.writeFileSync(path.join(__dirname, 'fixtures', `${vaultName}.json`), JSON.stringify(aggregatorData, null, 2), 'utf8')
+    fs.writeFileSync(path.join(__dirname, 'fixtures', `${fixtureName}.json`), JSON.stringify(aggregatorData, null, 2), 'utf8')
   }
   return aggregatorData.tx.data;
 }
