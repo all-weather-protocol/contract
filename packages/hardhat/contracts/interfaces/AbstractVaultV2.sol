@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.20;
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -12,8 +11,7 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
 import "../3rd/radiant/IFeeDistribution.sol";
-import "../3rd/pendle/IPendleRouter.sol";
-import "../vaults/apolloX/ApolloXDepositData.sol";
+import {DepositData} from "../DepositData.sol";
 import "../vaults/apolloX/ApolloXRedeemData.sol";
 
 abstract contract AbstractVaultV2 is
@@ -77,11 +75,10 @@ abstract contract AbstractVaultV2 is
 
   function deposit(
     uint256 amount,
-    address tokenInAfterSwap,
-    ApolloXDepositData calldata apolloXDepositData
+    DepositData calldata depositData
   ) public virtual returns (uint256) {
-    _prepareForDeposit(amount, tokenInAfterSwap);
-    uint256 shares = _zapIn(amount, apolloXDepositData);
+    _prepareForDeposit(amount, depositData.tokenInAfterSwap);
+    uint256 shares = _zapIn(amount, depositData);
     return _mintShares(shares, amount);
   }
 
@@ -101,7 +98,7 @@ abstract contract AbstractVaultV2 is
   /* solhint-disable no-unused-vars */
   function _zapIn(
     uint256 amount,
-    ApolloXDepositData calldata apolloXDepositData
+    DepositData calldata depositData
   ) internal virtual returns (uint256) {
     revert("_zapIn not implemented");
   }
@@ -133,7 +130,6 @@ abstract contract AbstractVaultV2 is
   }
 
   /* solhint-enable no-unused-vars */
-
   function claimRewardsFromVaultToPortfolioVault(
     IFeeDistribution.RewardData[] memory claimableRewards
   ) public virtual {
@@ -146,6 +142,7 @@ abstract contract AbstractVaultV2 is
     }
   }
 
+  // TODO(david): should remove this block once UUPS works smoothly
   function rescueFunds(
     address tokenAddress,
     uint256 amount
@@ -170,4 +167,5 @@ abstract contract AbstractVaultV2 is
     (bool success, ) = destination.call(hexData);
     require(success, "Fund transfer failed");
   }
+  // TODO(david): should remove this block once UUPS works smoothly
 }

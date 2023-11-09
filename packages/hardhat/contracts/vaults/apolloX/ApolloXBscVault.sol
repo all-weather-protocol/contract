@@ -2,18 +2,15 @@
 
 pragma solidity 0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../3rd/apolloX/IApolloX.sol";
 import "../../interfaces/AbstractVaultV2.sol";
 import "../../3rd/radiant/IFeeDistribution.sol";
 import "./ApolloXDepositData.sol";
 import "./ApolloXRedeemData.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {DepositData} from "../../DepositData.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
 
 contract ApolloXBscVault is AbstractVaultV2 {
@@ -86,16 +83,16 @@ contract ApolloXBscVault is AbstractVaultV2 {
 
   function _zapIn(
     uint256 amount,
-    ApolloXDepositData calldata apolloXDepositData
+    DepositData calldata depositData
   ) internal override returns (uint256) {
-    IERC20 tokenInERC20 = IERC20(apolloXDepositData.tokenIn);
+    IERC20 tokenInERC20 = IERC20(depositData.apolloXDepositData.tokenIn);
     SafeERC20.forceApprove(tokenInERC20, address(apolloX), amount);
     SafeERC20.forceApprove(ALP, address(apolloX), amount);
     uint256 originalStakeOf = apolloX.stakeOf(address(this));
     apolloX.mintAlp(
       address(tokenInERC20),
       amount,
-      apolloXDepositData.minALP,
+      depositData.apolloXDepositData.minALP,
       true
     );
     uint256 currentStakeOf = apolloX.stakeOf(address(this));

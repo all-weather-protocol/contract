@@ -12,7 +12,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./3rd/radiant/IFeeDistribution.sol";
 import "./3rd/pendle/IPendleRouter.sol";
 import "./interfaces/AbstractVaultV2.sol";
-import "./vaults/apolloX/ApolloXDepositData.sol";
+import {DepositData} from "./DepositData.sol";
 import "./vaults/apolloX/ApolloXRedeemData.sol";
 
 abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
@@ -34,14 +34,6 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     uint256 assets;
   }
 
-  struct DepositData {
-    uint256 amount;
-    address receiver;
-    address tokenIn;
-    address tokenInAfterSwap;
-    bytes aggregatorData;
-    ApolloXDepositData apolloXDepositData;
-  }
   struct RedeemData {
     uint256 amount;
     address receiver;
@@ -376,20 +368,14 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
         zapInAmountForThisVault
       );
 
-      if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
-        // slither-disable-next-line calls-loop
-        portfolioSharesToBeMinted = vaults[idx].deposit(
-          zapInAmountForThisVault,
-          depositData.tokenInAfterSwap,
-          depositData.apolloXDepositData
-        );
-        require(
-          portfolioSharesToBeMinted > 0,
-          "Buying ApolloX-ALP token failed"
-        );
-      } else {
-        revert(string(abi.encodePacked("Unknow Vault:", nameOfThisVault)));
-      }
+      // slither-disable-next-line calls-loop
+      portfolioSharesToBeMinted = vaults[idx].deposit(
+        zapInAmountForThisVault,
+        depositData
+        // depositData.tokenInAfterSwap,
+        // depositData.apolloXDepositData
+      );
+      require(portfolioSharesToBeMinted > 0, "Buying ApolloX-ALP token failed");
     }
     return portfolioSharesToBeMinted;
   }
