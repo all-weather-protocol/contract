@@ -12,7 +12,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
 import "../3rd/radiant/IFeeDistribution.sol";
 import {DepositData} from "../DepositData.sol";
-import "../vaults/apolloX/ApolloXRedeemData.sol";
+import {RedeemData} from "../RedeemData.sol";
 
 abstract contract AbstractVaultV2 is
   Initializable,
@@ -22,6 +22,7 @@ abstract contract AbstractVaultV2 is
   PausableUpgradeable
 {
   using SafeERC20 for IERC20;
+  error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
 
   address public oneInchAggregatorAddress;
 
@@ -114,15 +115,19 @@ abstract contract AbstractVaultV2 is
     return shares;
   }
 
-  /* solhint-disable no-unused-vars */
   function redeem(
     uint256 shares,
-    ApolloXRedeemData calldata apolloXRedeemData
-  ) public virtual returns (uint256) {
-    revert("Not implemented");
-  }
+    RedeemData calldata redeemData
+  ) public returns (uint256, address, address, bytes calldata) {
+    // this part was directly copy from ERC4626.sol
+    uint256 maxShares = maxRedeem(msg.sender);
+    if (shares > maxShares) {
+      revert ERC4626ExceededMaxRedeem(msg.sender, shares, maxShares);
+    }
+    _burn(msg.sender, shares);
 
-  /* solhint-enable no-unused-vars */
+    return _redeemFrom3rdPartyProtocol(shares, redeemData);
+  }
 
   /* solhint-disable no-unused-vars */
   function claim() public virtual {
@@ -130,6 +135,7 @@ abstract contract AbstractVaultV2 is
   }
 
   /* solhint-enable no-unused-vars */
+
   function claimRewardsFromVaultToPortfolioVault(
     IFeeDistribution.RewardData[] memory claimableRewards
   ) public virtual {
@@ -141,6 +147,16 @@ abstract contract AbstractVaultV2 is
       );
     }
   }
+
+  /* solhint-disable no-unused-vars */
+  function _redeemFrom3rdPartyProtocol(
+    uint256 shares,
+    RedeemData calldata redeemData
+  ) internal virtual returns (uint256, address, address, bytes calldata) {
+    revert("not implemented");
+  }
+
+  /* solhint-enable no-unused-vars */
 
   // TODO(david): should remove this block once UUPS works smoothly
   function rescueFunds(

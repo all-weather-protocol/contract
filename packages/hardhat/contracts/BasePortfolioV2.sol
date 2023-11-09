@@ -13,7 +13,7 @@ import "./3rd/radiant/IFeeDistribution.sol";
 import "./3rd/pendle/IPendleRouter.sol";
 import "./interfaces/AbstractVaultV2.sol";
 import {DepositData} from "./DepositData.sol";
-import "./vaults/apolloX/ApolloXRedeemData.sol";
+import {RedeemData} from "./RedeemData.sol";
 
 abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   using SafeERC20 for IERC20;
@@ -34,11 +34,6 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
     uint256 assets;
   }
 
-  struct RedeemData {
-    uint256 amount;
-    address receiver;
-    ApolloXRedeemData apolloXRedeemData;
-  }
   struct ClaimData {
     address receiver;
     VaultClaimData apolloXClaimData;
@@ -188,31 +183,15 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
         redeemData.amount,
         totalSupply()
       );
-      bytes32 bytesOfvaultName = keccak256(bytes(vaults[i].name()));
       if (vaultShares > 0) {
-        if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
-          uint256 redeemAmount = vaults[i].redeem(
-            vaultShares,
-            redeemData.apolloXRedeemData
-          );
-          if (redeemData.apolloXRedeemData.aggregatorData.length > 0) {
-            uint256 swappedAmount = _swap(
-              IERC20(redeemData.apolloXRedeemData.alpTokenOut),
-              redeemData.apolloXRedeemData.aggregatorData
-            );
-            SafeERC20.safeTransfer(
-              IERC20(redeemData.apolloXRedeemData.tokenOut),
-              redeemData.receiver,
-              swappedAmount
-            );
-          } else {
-            SafeERC20.safeTransfer(
-              IERC20(redeemData.apolloXRedeemData.alpTokenOut),
-              redeemData.receiver,
-              redeemAmount
-            );
-          }
-        }
+        (
+          uint256 redeemAmount,
+          address tokenOutFromRedeem,
+          address desiredTokenOut,
+          bytes memory aggregatorData
+        ) = vaults[i].redeem(vaultShares, redeemData);
+        // test case should fail if this one is commented!
+        // _returnRedeemInDesiredTokenToUser(redeemData.receiver, redeemAmount, tokenOutFromRedeem, desiredTokenOut, aggregatorData);
       }
     }
     _burn(msg.sender, redeemData.amount);
@@ -245,185 +224,24 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
       string memory protocolNameOfThisVault = totalClaimableRewards[vaultIdx]
         .protocol;
       bytes32 bytesOfvaultName = keccak256(bytes(protocolNameOfThisVault));
+      VaultClaimData calldata valutClaimData;
       if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
-        // slither-disable-next-line calls-loop
-        _claimAllTheRewardsInThisVault(
-          vaultIdx,
-          totalClaimableRewards,
-          protocolNameOfThisVault,
-          claimData.apolloXClaimData,
-          useDump,
-          claimData.receiver
-        );
+        valutClaimData = claimData.apolloXClaimData;
       } else {
         revert(
           string(abi.encodePacked("Unknow Vault:", protocolNameOfThisVault))
         );
       }
-    }
-  }
-
-  function _claimAllTheRewardsInThisVault(
-    uint256 vaultIdx,
-    ClaimableRewardOfAProtocol[] memory totalClaimableRewards,
-    string memory protocolNameOfThisVault,
-    VaultClaimData calldata valutClaimData,
-    bool useDump,
-    address receiver
-  ) internal {
-    try vaults[vaultIdx].claim() {
-      for (
-        uint256 rewardIdxOfThisVault = 0;
-        rewardIdxOfThisVault <
-        totalClaimableRewards[vaultIdx].claimableRewards.length;
-        rewardIdxOfThisVault++
-      ) {
-        address addressOfReward = totalClaimableRewards[vaultIdx]
-          .claimableRewards[rewardIdxOfThisVault]
-          .token;
-        _transferReward(
-          addressOfReward,
-          valutClaimData,
-          protocolNameOfThisVault,
-          useDump,
-          receiver
-        );
-        _resetUserRewardsOfInvestedProtocols(
-          address(vaults[vaultIdx]),
-          protocolNameOfThisVault,
-          addressOfReward
-        );
-      }
-    } catch Error(string memory _errorMessage) {
-      emit ClaimError(_errorMessage);
-    }
-  }
-
-  function _transferReward(
-    address addressOfReward,
-    VaultClaimData calldata valutClaimData,
-    string memory protocolNameOfThisVault,
-    bool useDump,
-    address receiver
-  ) internal {
-    IERC20 rewardToken = IERC20(addressOfReward);
-    if (useDump == false) {
-      SafeERC20.safeTransfer(
-        rewardToken,
-        receiver,
-        userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
-          addressOfReward
-        ]
-      );
-    } else {
-      uint256 swappedAmount = _swap(rewardToken, valutClaimData.aggregatorData);
-      SafeERC20.safeTransfer(
-        IERC20(valutClaimData.tokenOut),
-        receiver,
-        swappedAmount
-      );
-    }
-  }
-
-  function _getToken(
-    DepositData calldata depositData
-  ) internal returns (address, uint256) {
-    SafeERC20.safeTransferFrom(
-      IERC20(depositData.tokenIn),
-      msg.sender,
-      address(this),
-      depositData.amount
-    );
-    if (depositData.aggregatorData.length > 0) {
-      return (
-        depositData.tokenInAfterSwap,
-        _swap(IERC20(depositData.tokenIn), depositData.aggregatorData)
-      );
-    }
-    return (depositData.tokenIn, depositData.amount);
-  }
-
-  function _diversify(
-    DepositData calldata depositData,
-    address addressOfTokenForDiversification,
-    uint256 amountOfTokenForDiversification
-  ) internal returns (uint256) {
-    uint256 portfolioSharesToBeMinted = 0;
-    for (uint256 idx = 0; idx < vaults.length; idx++) {
       // slither-disable-next-line calls-loop
-      string memory nameOfThisVault = vaults[idx].name();
-      bytes32 bytesOfvaultName = keccak256(bytes(nameOfThisVault));
-      uint256 zapInAmountForThisVault = Math.mulDiv(
-        amountOfTokenForDiversification,
-        portfolioAllocation[nameOfThisVault],
-        100
+      _claimAllTheRewardsInThisVault(
+        vaultIdx,
+        totalClaimableRewards,
+        protocolNameOfThisVault,
+        valutClaimData,
+        useDump,
+        claimData.receiver
       );
-      // slither-disable-next-line incorrect-equality
-      if (zapInAmountForThisVault == 0) {
-        continue;
-      }
-      SafeERC20.forceApprove(
-        IERC20(addressOfTokenForDiversification),
-        address(vaults[idx]),
-        zapInAmountForThisVault
-      );
-
-      // slither-disable-next-line calls-loop
-      portfolioSharesToBeMinted = vaults[idx].deposit(
-        zapInAmountForThisVault,
-        depositData
-        // depositData.tokenInAfterSwap,
-        // depositData.apolloXDepositData
-      );
-      require(portfolioSharesToBeMinted > 0, "Buying ApolloX-ALP token failed");
     }
-    return portfolioSharesToBeMinted;
-  }
-
-  function _mintShares(
-    DepositData calldata depositData,
-    uint256 portfolioSharesToBeMinted
-  ) internal {
-    (bool succ, uint256 shares) = Math.tryDiv(
-      portfolioSharesToBeMinted,
-      UNIT_OF_SHARES
-    );
-    require(succ, "Division failed");
-    require(shares > 0, "Shares must > 0");
-    _mint(depositData.receiver, shares);
-  }
-
-  function _swap(
-    IERC20 rewardToken,
-    bytes calldata aggregatorData
-  ) public returns (uint256) {
-    SafeERC20.forceApprove(
-      rewardToken,
-      oneInchAggregatorAddress,
-      rewardToken.balanceOf(address(this))
-    );
-    // slither-disable-next-line low-level-calls
-    (bool succ, bytes memory data) = address(oneInchAggregatorAddress).call(
-      aggregatorData
-    );
-    require(
-      succ,
-      "Aggregator failed to swap, please update your block_number when running hardhat test"
-    );
-    return abi.decode(data, (uint256));
-  }
-
-  function _resetUserRewardsOfInvestedProtocols(
-    address vaultAddress,
-    string memory protocolNameOfThisVault,
-    address addressOfReward
-  ) internal {
-    pointersOfThisPortfolioForRecordingDistributedRewards[vaultAddress][
-      addressOfReward
-    ] = 0;
-    userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
-      addressOfReward
-    ] = 0;
   }
 
   function getClaimableRewards(
@@ -467,6 +285,185 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
       });
     }
     return totalClaimableRewards;
+  }
+
+  function _getToken(
+    DepositData calldata depositData
+  ) internal returns (address, uint256) {
+    SafeERC20.safeTransferFrom(
+      IERC20(depositData.tokenIn),
+      msg.sender,
+      address(this),
+      depositData.amount
+    );
+    if (depositData.aggregatorData.length > 0) {
+      return (
+        depositData.tokenInAfterSwap,
+        _swap(IERC20(depositData.tokenIn), depositData.aggregatorData)
+      );
+    }
+    return (depositData.tokenIn, depositData.amount);
+  }
+
+  function _diversify(
+    DepositData calldata depositData,
+    address addressOfTokenForDiversification,
+    uint256 amountOfTokenForDiversification
+  ) internal returns (uint256) {
+    uint256 portfolioSharesToBeMinted = 0;
+    for (uint256 idx = 0; idx < vaults.length; idx++) {
+      // slither-disable-next-line calls-loop
+      string memory nameOfThisVault = vaults[idx].name();
+      uint256 zapInAmountForThisVault = Math.mulDiv(
+        amountOfTokenForDiversification,
+        portfolioAllocation[nameOfThisVault],
+        100
+      );
+      // slither-disable-next-line incorrect-equality
+      if (zapInAmountForThisVault == 0) {
+        continue;
+      }
+      SafeERC20.forceApprove(
+        IERC20(addressOfTokenForDiversification),
+        address(vaults[idx]),
+        zapInAmountForThisVault
+      );
+
+      // slither-disable-next-line calls-loop
+      portfolioSharesToBeMinted = vaults[idx].deposit(
+        zapInAmountForThisVault,
+        depositData
+      );
+      require(portfolioSharesToBeMinted > 0, "Zap-In failed");
+    }
+    return portfolioSharesToBeMinted;
+  }
+
+  function _mintShares(
+    DepositData calldata depositData,
+    uint256 portfolioSharesToBeMinted
+  ) internal {
+    (bool succ, uint256 shares) = Math.tryDiv(
+      portfolioSharesToBeMinted,
+      UNIT_OF_SHARES
+    );
+    require(succ, "Division failed");
+    require(shares > 0, "Shares must > 0");
+    _mint(depositData.receiver, shares);
+  }
+
+  function _returnRedeemInDesiredTokenToUser(
+    address receiver,
+    uint256 redeemAmount,
+    address tokenOutFromRedeem,
+    address desiredTokenOut,
+    bytes memory aggregatorData
+  ) internal {
+    if (aggregatorData.length > 0) {
+      uint256 swappedAmount = _swap(IERC20(tokenOutFromRedeem), aggregatorData);
+      SafeERC20.safeTransfer(IERC20(desiredTokenOut), receiver, swappedAmount);
+    } else {
+      SafeERC20.safeTransfer(
+        IERC20(tokenOutFromRedeem),
+        receiver,
+        redeemAmount
+      );
+    }
+  }
+
+  function _claimAllTheRewardsInThisVault(
+    uint256 vaultIdx,
+    ClaimableRewardOfAProtocol[] memory totalClaimableRewards,
+    string memory protocolNameOfThisVault,
+    VaultClaimData calldata valutClaimData,
+    bool useDump,
+    address receiver
+  ) internal {
+    try vaults[vaultIdx].claim() {
+      for (
+        uint256 rewardIdxOfThisVault = 0;
+        rewardIdxOfThisVault <
+        totalClaimableRewards[vaultIdx].claimableRewards.length;
+        rewardIdxOfThisVault++
+      ) {
+        address addressOfReward = totalClaimableRewards[vaultIdx]
+          .claimableRewards[rewardIdxOfThisVault]
+          .token;
+        _returnRewardsInPreferredToken(
+          addressOfReward,
+          valutClaimData,
+          protocolNameOfThisVault,
+          useDump,
+          receiver
+        );
+        _resetUserRewardsOfInvestedProtocols(
+          address(vaults[vaultIdx]),
+          protocolNameOfThisVault,
+          addressOfReward
+        );
+      }
+    } catch Error(string memory _errorMessage) {
+      emit ClaimError(_errorMessage);
+    }
+  }
+
+  function _returnRewardsInPreferredToken(
+    address addressOfReward,
+    VaultClaimData calldata valutClaimData,
+    string memory protocolNameOfThisVault,
+    bool useDump,
+    address receiver
+  ) internal {
+    IERC20 rewardToken = IERC20(addressOfReward);
+    if (useDump == false) {
+      SafeERC20.safeTransfer(
+        rewardToken,
+        receiver,
+        userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
+          addressOfReward
+        ]
+      );
+    } else {
+      uint256 swappedAmount = _swap(rewardToken, valutClaimData.aggregatorData);
+      SafeERC20.safeTransfer(
+        IERC20(valutClaimData.tokenOut),
+        receiver,
+        swappedAmount
+      );
+    }
+  }
+
+  function _swap(
+    IERC20 rewardToken,
+    bytes memory aggregatorData
+  ) public returns (uint256) {
+    SafeERC20.forceApprove(
+      rewardToken,
+      oneInchAggregatorAddress,
+      rewardToken.balanceOf(address(this))
+    );
+    // slither-disable-next-line low-level-calls
+    (bool succ, bytes memory data) = address(oneInchAggregatorAddress).call(
+      aggregatorData
+    );
+    require(
+      succ,
+      "Aggregator failed to swap, please update your block_number when running hardhat test"
+    );
+    return abi.decode(data, (uint256));
+  }
+
+  function _resetUserRewardsOfInvestedProtocols(
+    address vaultAddress,
+    string memory protocolNameOfThisVault,
+    address addressOfReward
+  ) internal {
+    pointersOfThisPortfolioForRecordingDistributedRewards[vaultAddress][
+      addressOfReward
+    ] = 0;
+    userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
+      addressOfReward
+    ] = 0;
   }
 
   function rescueFunds(

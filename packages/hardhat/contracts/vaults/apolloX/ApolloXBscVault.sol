@@ -11,13 +11,11 @@ import "../../3rd/radiant/IFeeDistribution.sol";
 import "./ApolloXDepositData.sol";
 import "./ApolloXRedeemData.sol";
 import {DepositData} from "../../DepositData.sol";
+import {RedeemData} from "../../RedeemData.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
 
 contract ApolloXBscVault is AbstractVaultV2 {
   using SafeERC20 for IERC20;
-
-  error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
-  event WithdrawFailed(address token);
 
   IApolloX public apolloX;
   IERC20 public ALP;
@@ -81,57 +79,6 @@ contract ApolloXBscVault is AbstractVaultV2 {
     return IERC20(asset()).balanceOf(address(this));
   }
 
-  function _zapIn(
-    uint256 amount,
-    DepositData calldata depositData
-  ) internal override returns (uint256) {
-    IERC20 tokenInERC20 = IERC20(depositData.apolloXDepositData.tokenIn);
-    SafeERC20.forceApprove(tokenInERC20, address(apolloX), amount);
-    SafeERC20.forceApprove(ALP, address(apolloX), amount);
-    uint256 originalStakeOf = apolloX.stakeOf(address(this));
-    apolloX.mintAlp(
-      address(tokenInERC20),
-      amount,
-      depositData.apolloXDepositData.minALP,
-      true
-    );
-    uint256 currentStakeOf = apolloX.stakeOf(address(this));
-    uint256 mintedALPAmount = currentStakeOf - originalStakeOf;
-    return mintedALPAmount;
-  }
-
-  function redeem(
-    uint256 shares,
-    ApolloXRedeemData calldata apolloXRedeemData
-  ) public override returns (uint256) {
-    // this part was directly copy from ERC4626.sol
-    uint256 maxShares = maxRedeem(msg.sender);
-    if (shares > maxShares) {
-      revert ERC4626ExceededMaxRedeem(msg.sender, shares, maxShares);
-    }
-    _burn(msg.sender, shares);
-
-    apolloX.unStake(shares);
-    SafeERC20.forceApprove(ALP, address(apolloX), shares);
-    uint256 originalTokenOutBalance = IERC20(apolloXRedeemData.alpTokenOut)
-      .balanceOf(address(this));
-    apolloX.burnAlp(
-      apolloXRedeemData.alpTokenOut,
-      shares,
-      apolloXRedeemData.minOut,
-      address(this)
-    );
-    uint256 currentTokenOutBalance = IERC20(apolloXRedeemData.alpTokenOut)
-      .balanceOf(address(this));
-    uint256 redeemAmount = currentTokenOutBalance - originalTokenOutBalance;
-    SafeERC20.safeTransfer(
-      IERC20(apolloXRedeemData.alpTokenOut),
-      msg.sender,
-      redeemAmount
-    );
-    return redeemAmount;
-  }
-
   function claim() public override {
     IFeeDistribution.RewardData[]
       memory claimableRewards = getClaimableRewards();
@@ -170,6 +117,33 @@ contract ApolloXBscVault is AbstractVaultV2 {
     return rewards;
   }
 
+  function getPerformanceFeeRateMetaData()
+    public
+    view
+    returns (uint256, uint256)
+  {
+    return (ratioAfterPerformanceFee, denominator);
+  }
+
+  function _zapIn(
+    uint256 amount,
+    DepositData calldata depositData
+  ) internal override returns (uint256) {
+    IERC20 tokenInERC20 = IERC20(depositData.apolloXDepositData.tokenIn);
+    SafeERC20.forceApprove(tokenInERC20, address(apolloX), amount);
+    SafeERC20.forceApprove(ALP, address(apolloX), amount);
+    uint256 originalStakeOf = apolloX.stakeOf(address(this));
+    apolloX.mintAlp(
+      address(tokenInERC20),
+      amount,
+      depositData.apolloXDepositData.minALP,
+      true
+    );
+    uint256 currentStakeOf = apolloX.stakeOf(address(this));
+    uint256 mintedALPAmount = currentStakeOf - originalStakeOf;
+    return mintedALPAmount;
+  }
+
   function _calClaimableAmountAfterPerformanceFee(
     uint256 claimableRewardsBelongsToThisPortfolio
   ) internal view returns (uint256) {
@@ -185,11 +159,35 @@ contract ApolloXBscVault is AbstractVaultV2 {
       );
   }
 
-  function getPerformanceFeeRateMetaData()
-    public
-    view
-    returns (uint256, uint256)
-  {
-    return (ratioAfterPerformanceFee, denominator);
+  function _redeemFrom3rdPartyProtocol(
+    uint256 shares,
+    RedeemData calldata redeemData
+  ) internal override returns (uint256, address, address, bytes calldata) {
+    apolloX.unStake(shares);
+    SafeERC20.forceApprove(ALP, address(apolloX), shares);
+    uint256 originalTokenOutBalance = IERC20(
+      redeemData.apolloXRedeemData.alpTokenOut
+    ).balanceOf(address(this));
+    apolloX.burnAlp(
+      redeemData.apolloXRedeemData.alpTokenOut,
+      shares,
+      redeemData.apolloXRedeemData.minOut,
+      address(this)
+    );
+    uint256 currentTokenOutBalance = IERC20(
+      redeemData.apolloXRedeemData.alpTokenOut
+    ).balanceOf(address(this));
+    uint256 redeemAmount = currentTokenOutBalance - originalTokenOutBalance;
+    SafeERC20.safeTransfer(
+      IERC20(redeemData.apolloXRedeemData.alpTokenOut),
+      msg.sender,
+      redeemAmount
+    );
+    return (
+      redeemAmount,
+      redeemData.apolloXRedeemData.alpTokenOut,
+      redeemData.apolloXRedeemData.tokenOut,
+      redeemData.apolloXRedeemData.aggregatorData
+    );
   }
 }
