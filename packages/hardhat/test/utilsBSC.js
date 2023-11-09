@@ -54,11 +54,11 @@ async function deployContracts(allocations, deployer, wallet2) {
   await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10);
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
-  const portfolioContract = await StableCoinVaultFactory.connect(deployer).deploy("StableCoinLP", "SCLP", apolloxBscVault.target, {gasLimit:30000000});
+  const portfolioContract = await upgrades.deployProxy(await StableCoinVaultFactory.connect(deployer), ["StableCoinLP", "SCLP", apolloxBscVault.target], {gasLimit:30000000, kind: 'uups'});
   await portfolioContract.waitForDeployment();
 
-  await portfolioContract.setVaultAllocations(allocations).then((tx) => tx.wait());
-  await portfolioContract.updateOneInchAggregatorAddress(oneInchBscAddress).then((tx) => tx.wait());
+  await portfolioContract.connect(deployer).setVaultAllocations(allocations).then((tx) => tx.wait());
+  await portfolioContract.connect(deployer).updateOneInchAggregatorAddress(oneInchBscAddress).then((tx) => tx.wait());
   await _checkAllcation(allocations, portfolioContract);
 
   // some token chores and initilization top up
@@ -155,7 +155,7 @@ async function fetch1InchSwapData(chainID, fromTokenAddress, toTokenAddress, amo
     'Authorization': `Bearer ${process.env['ONE_INCH_API_KEY']}`,
     'accept': 'application/json'
   };
-  const res = await got(`https://api.1inch.dev/swap/v5.2/${chainID}/swap?src=${fromTokenAddress}&dst=${toTokenAddress}&amount=${amount.toString()}&from=${fromAddress}&slippage=${slippage}&disableEstimate=true`, {
+  const res = await got(`https://api.1inch.dev/swap/v5.2/${chainID}/swap?src=${fromTokenAddress}&dst=${toTokenAddress}&amount=${amount.toString()}&from=${fromAddress}&slippage=${slippage}&disableEstimate=true&compatibility=true`, {
     headers,
     retry: {
       limit: 1, // Number of retries

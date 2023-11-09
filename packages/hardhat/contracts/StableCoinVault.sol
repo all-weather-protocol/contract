@@ -8,12 +8,13 @@ import "./BasePortfolioV2.sol";
 contract StableCoinVault is BasePortfolioV2 {
   using SafeERC20 for IERC20;
 
-  /// @custom:oz-upgrades-unsafe-allow constructor
-  constructor(
+  function initialize(
     string memory name_,
     string memory symbol_,
     address apolloXBscVaultAddr
-  ) BasePortfolioV2(name_, symbol_) {
+  ) public initializer {
+    BasePortfolioV2._initialize(name_, symbol_);
+
     require(
       apolloXBscVaultAddr != address(0),
       "apolloXBscVaultAddr cannot be zero"

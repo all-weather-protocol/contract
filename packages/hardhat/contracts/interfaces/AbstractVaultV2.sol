@@ -10,6 +10,7 @@ import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC2
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "../3rd/radiant/IFeeDistribution.sol";
 import {DepositData} from "../DepositData.sol";
 import {RedeemData} from "../RedeemData.sol";
@@ -19,7 +20,8 @@ abstract contract AbstractVaultV2 is
   UUPSUpgradeable,
   ERC4626Upgradeable,
   OwnableUpgradeable,
-  PausableUpgradeable
+  PausableUpgradeable,
+  ReentrancyGuardUpgradeable
 {
   using SafeERC20 for IERC20;
   error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
@@ -39,6 +41,9 @@ abstract contract AbstractVaultV2 is
     ERC4626Upgradeable.__ERC4626_init(asset_);
     ERC20Upgradeable.__ERC20_init(name_, symbol_);
     OwnableUpgradeable.__Ownable_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+    UUPSUpgradeable.__UUPSUpgradeable_init();
+    PausableUpgradeable.__Pausable_init();
   }
 
   // solhint-disable-next-line no-empty-blocks
@@ -77,7 +82,7 @@ abstract contract AbstractVaultV2 is
   function deposit(
     uint256 amount,
     DepositData calldata depositData
-  ) public virtual returns (uint256) {
+  ) public virtual nonReentrant returns (uint256) {
     _prepareForDeposit(amount, depositData.tokenInAfterSwap);
     uint256 shares = _zapIn(amount, depositData);
     return _mintShares(shares, amount);
@@ -118,7 +123,7 @@ abstract contract AbstractVaultV2 is
   function redeem(
     uint256 shares,
     RedeemData calldata redeemData
-  ) public returns (uint256, address, address, bytes calldata) {
+  ) public nonReentrant returns (uint256, address, address, bytes calldata) {
     // this part was directly copy from ERC4626.sol
     uint256 maxShares = maxRedeem(msg.sender);
     if (shares > maxShares) {
@@ -130,7 +135,7 @@ abstract contract AbstractVaultV2 is
   }
 
   /* solhint-disable no-unused-vars */
-  function claim() public virtual {
+  function claim() public virtual nonReentrant {
     revert("Not implemented");
   }
 

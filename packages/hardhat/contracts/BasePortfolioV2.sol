@@ -1,21 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+
 import "./3rd/radiant/IFeeDistribution.sol";
 import "./3rd/pendle/IPendleRouter.sol";
 import "./interfaces/AbstractVaultV2.sol";
 import {DepositData} from "./DepositData.sol";
 import {RedeemData} from "./RedeemData.sol";
 
-abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
+abstract contract BasePortfolioV2 is
+  Initializable,
+  UUPSUpgradeable,
+  ERC20Upgradeable,
+  OwnableUpgradeable,
+  PausableUpgradeable,
+  ReentrancyGuardUpgradeable
+{
   using SafeERC20 for IERC20;
 
   event ClaimError(string errorMessage);
@@ -63,10 +72,24 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   uint256 public constant UNIT_OF_SHARES = 1e10;
   address public oneInchAggregatorAddress;
 
-  constructor(
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
+  function _initialize(
     string memory name_,
     string memory symbol_
-  ) ERC20(name_, symbol_) Ownable(msg.sender) {}
+  ) public onlyInitializing {
+    ERC20Upgradeable.__ERC20_init(name_, symbol_);
+    OwnableUpgradeable.__Ownable_init();
+    ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
+    UUPSUpgradeable.__UUPSUpgradeable_init();
+    PausableUpgradeable.__Pausable_init();
+  }
+
+  // solhint-disable-next-line no-empty-blocks
+  function _authorizeUpgrade(address) internal override onlyOwner {}
 
   function updateOneInchAggregatorAddress(
     address oneInchAggregatorAddress_
@@ -439,13 +462,13 @@ abstract contract BasePortfolioV2 is ERC20, Ownable, ReentrancyGuard, Pausable {
   }
 
   function _swap(
-    IERC20 rewardToken,
+    IERC20 tokenForSwap,
     bytes memory aggregatorData
   ) public returns (uint256) {
     SafeERC20.forceApprove(
-      rewardToken,
+      tokenForSwap,
       oneInchAggregatorAddress,
-      rewardToken.balanceOf(address(this))
+      tokenForSwap.balanceOf(address(this))
     );
     // slither-disable-next-line low-level-calls
     (bool succ, bytes memory data) = address(oneInchAggregatorAddress).call(

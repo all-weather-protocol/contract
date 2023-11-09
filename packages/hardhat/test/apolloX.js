@@ -94,7 +94,6 @@ describe("All Weather Protocol", function () {
       await claim(wallet.address, wallet, 149746684213576, contracts.portfolioContract, "apollox-claim-performance-fee-claim")
       const claimablePerformanceFee = await APX.balanceOf(contracts.apolloxBscVault.target);
       // currently, the performance fee is set to 80%, therefore, claimablePerformanceFee*4: claimalbeRewards = 1:1 = 20%*4 = 80%
-      console.log(claimablePerformanceFee*4n, claimableRewards[0].claimableRewards[0].amount);
       expect(isWithinPercentage(claimablePerformanceFee*4n, claimableRewards[0].claimableRewards[0].amount, 1)).to.be.true;
       
       // claim performance Fee
