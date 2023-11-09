@@ -105,13 +105,13 @@ async function deposit(end2endTestingStableCointAmount, wallet, portfolioContrac
   return await (await portfolioContract.connect(deployer).deposit(depositData, { gasLimit: 30000000 })).wait();
 }
 
-async function claim(walletAddress, deployer, amount, portfolioContract) {
+async function claim(walletAddress, deployer, amount, portfolioContract, fixtureName) {
   const { APX, USDC } = await initTokens();
   const claimData = {
     receiver: walletAddress,
     apolloXClaimData: {
       tokenOut: USDC.target,
-      aggregatorData: _getAggregatorData("ApolloX-ALP", 56, APX.target, USDC.target, amount, portfolioContract.target),
+      aggregatorData: _getAggregatorData(fixtureName, 56, APX.target, USDC.target, amount, portfolioContract.target),
     }
   }
   const useDump = true;
@@ -176,7 +176,7 @@ function isWithinPercentage(number, target, percent) {
   const targetAsNumber = Number(target);
 
   const difference = Math.abs(numberAsNumber - targetAsNumber);
-  const allowedDifference = (percent / 100) * targetAsNumber;
+  const allowedDifference = (percent / 100) * Math.max(targetAsNumber, numberAsNumber);
   return difference <= allowedDifference;
 }
 

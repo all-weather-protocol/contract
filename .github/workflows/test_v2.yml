@@ -25,6 +25,4 @@ jobs:
       - name: Test
         run: |
             export API_URL=https://rpc.ankr.com/bsc
-            BLOCK_NUMBER=33285876 yarn test test/apolloX/apolloX.js
-            BLOCK_NUMBER=33285876 yarn test test/apolloX/claim.js
-            BLOCK_NUMBER=33285876 yarn test test/apolloX/performanceFee.js
+            BLOCK_NUMBER=33285876 yarn test test/apolloX.js
