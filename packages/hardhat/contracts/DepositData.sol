@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 import {ApolloXDepositData} from "./vaults/apolloX/ApolloXDepositData.sol";
 struct DepositData {
   uint256 amount;

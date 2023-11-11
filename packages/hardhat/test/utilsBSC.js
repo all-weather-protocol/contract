@@ -32,6 +32,8 @@ async function getBeforeEachSetUp(allocations) {
   const deployer = wallet;
     
   const contracts = await deployContracts(allocations, deployer, wallet2);
+  // send BNB to portfolioContract for gas fee
+  await (await deployer.sendTransaction({ to: contracts.portfolioContract.target, value: ethers.parseEther("1"), gasLimit:30000000 })).wait();
   return {
     contracts,
     wallet,
@@ -51,21 +53,19 @@ async function deployContracts(allocations, deployer, wallet2) {
   await apolloxBscVault.waitForDeployment();
   // performance fee: 9.7%. However, the yield from APX consists of appreciation of principal and APX token, so the performance fee is 100% take from APX token.
   await upgrades.admin.changeProxyAdmin(apolloxBscVault.target, deployer.address);
-  await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10);
+  await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10, {gasLimit:30000000});
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
   const portfolioContract = await upgrades.deployProxy(await StableCoinVaultFactory.connect(deployer), ["StableCoinLP", "SCLP", apolloxBscVault.target], {gasLimit:30000000, kind: 'uups'});
   await portfolioContract.waitForDeployment();
 
-  await portfolioContract.connect(deployer).setVaultAllocations(allocations).then((tx) => tx.wait());
+  await portfolioContract.connect(deployer).setVaultAllocations(allocations, {gasLimit:30000000}).then((tx) => tx.wait());
   await portfolioContract.connect(deployer).updateOneInchAggregatorAddress(oneInchBscAddress).then((tx) => tx.wait());
   await _checkAllcation(allocations, portfolioContract);
 
   // some token chores and initilization top up
   await (await USDC.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
   await (await ALP.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
-  // send BNB to portfolioContract for gas fee
-  await (await deployer.sendTransaction({ to: portfolioContract.target, value: ethers.parseEther("1"), gasLimit:30000000 })).wait();
   return {
     portfolioContract, 
     apolloxBscVault};
@@ -189,5 +189,6 @@ module.exports = {
     mineBlocks,
     simulateTimeElasped,
     claim,
-    isWithinPercentage
+    isWithinPercentage,
+    deployContracts
 };

@@ -295,6 +295,11 @@ module.exports = {
         mnemonic: mnemonic(),
       },
     },
+    bscTest: {
+      url: "https://bsc-testnet.drpc.org/",
+      chainId: 97,
+      accounts: [`0x${PRIVATE_KEY}`]
+    },
     neonlabs: {
       url: 'https://devnet.neonevm.org',
       accounts: [PRIVATE_KEY],
@@ -327,7 +332,7 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6'
+    apiKey: '6QK3N5NY35YMWSIKZ9DPW6FGGXH3HIDRXC'
     // apiKey: {
     //   mainnet: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
     //   goerli: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
@@ -336,7 +341,8 @@ module.exports = {
     //   ropsten: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
     //   sepolia: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
     //   arbitrumGoerli: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6',
-    //   arbitrum: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6'
+    //   arbitrum: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6',
+    //   bscTest: "6QK3N5NY35YMWSIKZ9DPW6FGGXH3HIDRXC"
     //   // add other network's API key here
     // },
   },
