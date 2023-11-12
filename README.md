@@ -3,7 +3,9 @@
 ## Deploy & Verify
 
 1. For Main net: If you got some error, remember to first `rm -rf artifacts` and then `npx hardhat clean`
-2. For TestNet: `npx hardhat run --network arbitrumGoerli deploy/deployPermanentPortfolio.js`
+2. Deploy:
+    1. change `API_URL` to the right network you want to deploy to in `packages/hardhat/.env`
+    2. `npx hardhat run --network <network> deploy/deployPermanentPortfolio.js`
 3. For fronend development: `export TESTNET_API_URL=http://127.0.0.1:8545/; npx hardhat run --network localhost deploy/deployPermanentPortfolio.js`
 4. Chain: `export BLOCK_NUMBER=123270171; yarn chain`
 5. Update the contract addresses resides in `rebalance` server and `frontend`

@@ -291,9 +291,7 @@ module.exports = {
     bsc: {
       url: "https://bsc-dataseed1.binance.org/",
       chainId: 56,
-      accounts: {
-        mnemonic: mnemonic(),
-      },
+      accounts: [`0x${PRIVATE_KEY}`]
     },
     bscTest: {
       url: "https://bsc-testnet.drpc.org/",

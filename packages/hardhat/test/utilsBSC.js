@@ -50,17 +50,24 @@ async function deployContracts(allocations, deployer, wallet2) {
   const deployerConnectedFactory = apolloxBsc.connect(deployer);
 
   const apolloxBscVault = await upgrades.deployProxy(deployerConnectedFactory, [ALP.target, "ApolloX-ALP", "ALP-APO-ALP", 1, 1], {gasLimit:30000000, kind: 'uups'});
+  console.log("deployed apolloxBscVault")
   await apolloxBscVault.waitForDeployment();
+  console.log("apolloxBscVault proxy deployed", apolloxBscVault.target)
   // performance fee: 9.7%. However, the yield from APX consists of appreciation of principal and APX token, so the performance fee is 100% take from APX token.
-  await upgrades.admin.changeProxyAdmin(apolloxBscVault.target, deployer.address);
+  // await upgrades.admin.changeProxyAdmin(apolloxBscVault.target, deployer.address);
+  // console.log("apolloxBscVault proxy admin changed")
   await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10, {gasLimit:30000000});
+  console.log("apolloxBscVault performance fee updated")
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
   const portfolioContract = await upgrades.deployProxy(await StableCoinVaultFactory.connect(deployer), ["StableCoinLP", "SCLP", apolloxBscVault.target], {gasLimit:30000000, kind: 'uups'});
+  console.log("deployed portfolioContract")
   await portfolioContract.waitForDeployment();
+  console.log("portfolioContract proxy deployed", portfolioContract.target)
 
   await portfolioContract.connect(deployer).setVaultAllocations(allocations, {gasLimit:30000000}).then((tx) => tx.wait());
   await portfolioContract.connect(deployer).updateOneInchAggregatorAddress(oneInchBscAddress).then((tx) => tx.wait());
+  console.log("portfolioContract allocations updated")
   await _checkAllcation(allocations, portfolioContract);
 
   // some token chores and initilization top up
