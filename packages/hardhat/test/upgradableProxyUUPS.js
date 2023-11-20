@@ -20,7 +20,7 @@ describe("All Weather Protocol", function () {
   describe("ApolloX Contract Test", function () {
     it('proxy should be able to upgrade', async () => {
       const apolloxBsc = (await ethers.getContractFactory("ApolloXBscVault")).connect(deployer);
-      const apolloxBscV2 = (await ethers.getContractFactory("ApolloXBscVaultV2")).connect(deployer);
+      const apolloxBscV2 = (await ethers.getContractFactory("ApolloXBscVaultForUpgrade")).connect(deployer);
     
       const apolloxBscVault = await upgrades.deployProxy(apolloxBsc, [ALP.target, "ApolloX-ALP", "ALP-APO-ALP", 1, 1], {gasLimit:30000000, kind: 'uups'});
       await apolloxBscVault.waitForDeployment();

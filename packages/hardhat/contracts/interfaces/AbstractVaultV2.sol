@@ -82,7 +82,7 @@ abstract contract AbstractVaultV2 is
   function deposit(
     uint256 amount,
     DepositData calldata depositData
-  ) public virtual nonReentrant returns (uint256) {
+  ) public virtual nonReentrant whenNotPaused returns (uint256) {
     _prepareForDeposit(amount, depositData.tokenInAfterSwap);
     uint256 shares = _zapIn(amount, depositData);
     return _mintShares(shares, amount);

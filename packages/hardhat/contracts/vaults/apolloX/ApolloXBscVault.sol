@@ -79,7 +79,7 @@ contract ApolloXBscVault is AbstractVaultV2 {
     return IERC20(asset()).balanceOf(address(this));
   }
 
-  function claim() public override nonReentrant {
+  function claim() public override nonReentrant whenNotPaused {
     IFeeDistribution.RewardData[]
       memory claimableRewards = getClaimableRewards();
     if (claimableRewards.length != 0) {

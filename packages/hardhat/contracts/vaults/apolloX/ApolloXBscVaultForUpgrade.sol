@@ -14,7 +14,7 @@ import {DepositData} from "../../DepositData.sol";
 import {RedeemData} from "../../RedeemData.sol";
 import {IERC20MetadataUpgradeable} from "@openzeppelin/contracts-upgradeable/interfaces/IERC20MetadataUpgradeable.sol";
 
-contract ApolloXBscVaultV2 is AbstractVaultV2 {
+contract ApolloXBscVaultForUpgrade is AbstractVaultV2 {
   using SafeERC20 for IERC20;
 
   IApolloX public apolloX;
