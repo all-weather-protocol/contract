@@ -26,4 +26,5 @@ jobs:
         run: |
             export API_URL=https://rpc.ankr.com/bsc
             BLOCK_NUMBER=33285876 yarn test test/apolloX.js
+            BLOCK_NUMBER=33285876 yarn test test/apolloX_claim.js
             BLOCK_NUMBER=33285876 yarn test test/upgradableProxyUUPS.js

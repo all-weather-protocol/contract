@@ -228,15 +228,7 @@ abstract contract BasePortfolioV2 is
   function claim(
     ClaimData calldata claimData,
     bool useDump
-  ) external whenNotPaused nonReentrant {
-    // this function is for `nonReentrant`
-    _claim(claimData, useDump);
-  }
-
-  function _claim(
-    ClaimData calldata claimData,
-    bool useDump
-  ) private whenNotPaused updateRewards {
+  ) external whenNotPaused updateRewards {
     ClaimableRewardOfAProtocol[]
       memory totalClaimableRewards = getClaimableRewards(payable(msg.sender));
     uint256 userShares = balanceOf(msg.sender);
@@ -406,7 +398,7 @@ abstract contract BasePortfolioV2 is
     VaultClaimData calldata valutClaimData,
     bool useDump,
     address receiver
-  ) internal {
+  ) internal nonReentrant {
     try vaults[vaultIdx].claim() {
       for (
         uint256 rewardIdxOfThisVault = 0;
