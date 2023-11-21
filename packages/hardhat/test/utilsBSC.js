@@ -7,17 +7,19 @@ const path = require('path');
 config();
 // wallets
 const myImpersonatedWalletAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
-const myImpersonatedWalletAddress2 = "0x2170Ed0880ac9A755fd29B2688956BD959F933F8";
+const myImpersonatedWalletAddress2 = "0xf89d7b9c864f589bbf53a82105107622b35eaa40";
 const oneInchBscAddress = '0x1111111254eeb25477b68fb85ed929f73a960582';
 const end2endTestingStableCointAmount = ethers.parseUnits('10', 18);
 const gasLimit = 30000000;
+const USDC_ADDRESS = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d';
+const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955'
 
 async function initTokens() {
     const ALP = await ethers.getContractAt("IERC20", "0x4E47057f45adF24ba41375a175dA0357cB3480E5");
     const ApolloX = await ethers.getContractAt("IApolloX", "0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0");
-    const USDC = await ethers.getContractAt('IERC20', "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
+    const USDC = await ethers.getContractAt('IERC20', USDC_ADDRESS);
     const APX = await ethers.getContractAt('IERC20', "0x78F5d389F5CDCcFc41594aBaB4B0Ed02F31398b3");
-    const USDT = await ethers.getContractAt('IERC20', "0x55d398326f99059fF775485246999027B3197955");
+    const USDT = await ethers.getContractAt('IERC20', USDT_ADDRESS);
     return {
         ALP,
         USDC,
@@ -44,7 +46,7 @@ async function getBeforeEachSetUp(allocations) {
 
 
 async function deployContracts(allocations, deployer, wallet2) {
-  const { ALP, USDC } = await initTokens();
+  const { ALP, USDC, USDT } = await initTokens();
 
   const apolloxBsc = await ethers.getContractFactory("ApolloXBscVault");
   const deployerConnectedFactory = apolloxBsc.connect(deployer);
@@ -63,8 +65,11 @@ async function deployContracts(allocations, deployer, wallet2) {
   await _checkAllcation(allocations, portfolioContract);
 
   // some token chores and initilization top up
-  await (await USDC.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
-  await (await ALP.connect(deployer).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
+  for (const wallet of [deployer, wallet2]) {    
+    await (await USDC.connect(wallet).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
+    await (await USDT.connect(wallet).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
+    await (await ALP.connect(wallet).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
+  }
   return {
     portfolioContract, 
     apolloxBscVault};
@@ -81,7 +86,7 @@ async function _checkAllcation(allocations, portfolioContract) {
 }
 
 
-async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract, fixtureName) {
+async function deposit(end2endTestingStableCointAmount, wallet, portfolioContract, fixtureName, tokenInAddress=USDC_ADDRESS, tokenOutAddress=USDT_ADDRESS) {
   const { USDC, USDT } = await initTokens();
   const apolloXDepositData = {
     tokenIn: USDT.target,
@@ -89,15 +94,16 @@ async function deposit(end2endTestingStableCointAmount, wallet, portfolioContrac
     minALP: ethers.parseEther("1")/ BigInt(12) * BigInt(10)
   }
 
+  console.log("wallet", wallet.address)
   const depositData = {
     amount: end2endTestingStableCointAmount,
     receiver: wallet.address,
-    tokenIn: USDC.target,
-    tokenInAfterSwap: USDT.target,
-    aggregatorData: _getAggregatorData(fixtureName, 56, USDC.target, USDT.target, end2endTestingStableCointAmount, portfolioContract.target, fixtureName),
+    tokenIn: tokenInAddress,
+    tokenInAfterSwap: tokenOutAddress,
+    aggregatorData: fixtureName !== '' ? _getAggregatorData(fixtureName, 56, USDC.target, USDT.target, end2endTestingStableCointAmount, portfolioContract.target, fixtureName): ethers.toUtf8Bytes(''),
     apolloXDepositData
   }
-  return await (await portfolioContract.connect(deployer).deposit(depositData, { gasLimit: 30000000 })).wait();
+  return await (await portfolioContract.connect(wallet).deposit(depositData, { gasLimit: 30000000 })).wait();
 }
 
 async function claim(walletAddress, deployer, amount, portfolioContract, fixtureName) {
@@ -175,6 +181,13 @@ function isWithinPercentage(number, target, percent) {
   return difference <= allowedDifference;
 }
 
+async function simulateTimeElasped(timeElasped = 12 * 31 * 86400) {
+  // Simulate a year later
+  const futureTimestamp = currentTimestamp + timeElasped;
+  await ethers.provider.send('evm_setNextBlockTimestamp', [futureTimestamp]);
+  await ethers.provider.send('evm_mine');
+}
+
 module.exports = {
     getBeforeEachSetUp,
     initTokens,
@@ -185,5 +198,6 @@ module.exports = {
     simulateTimeElasped,
     claim,
     isWithinPercentage,
-    deployContracts
+    deployContracts,
+    simulateTimeElasped
 };
