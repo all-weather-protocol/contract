@@ -5,7 +5,6 @@ const {
     getBeforeEachSetUp,
     initTokens,
     mineBlocks,
-    isWithinPercentage,
     simulateTimeElasped,
     claim,
     gasLimit
@@ -84,54 +83,41 @@ describe("All Weather Protocol", function () {
             expect(await contracts.portfolioContract.rewardPerShareZappedIn(vaultName, APX.target)).to.be.gt(0);
         })
 
-        // it("Reward Should be different, if they zap in different timeing", async function () {
-        //     this.timeout(2400000); // Set timeout to 120 seconds
-        //     expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target)).to.equal(0);
-        //     expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target)).to.equal(0);
-        //     expect(await portfolioContract.rewardPerShareZappedIn(vaultName, APX.target)).to.equal(0);
-        //     const receipt = await deposit(end2endTestingAmount, wallet, pendleGLPZapInData, pendleGDAIZapInData, oneInchSwapDataForGDAI, oneInchSwapDataForRETH, pendleRETHZapInData, oneInchSwapDataForMagic, pendlePendleZapInData);
-
-        //     await mineBlocks(1700); // wait for 7 hours, otherwise the reward/shares would be too small and be rounded to 0
-        //     const claimableRewards = await portfolioContract.getClaimableRewards(wallet.address);
-        //     for (claimableReward of claimableRewards) {
-        //         if (claimableReward.protocol !== await vaultName) {
-        //             expect(claimableReward.claimableRewards).to.deep.equal([]);
-        //         } else {
-        //             expect(claimableReward.claimableRewards.length).to.equal(8);
-        //             for (const [index, reward] of claimableReward.claimableRewards.entries()) {
-        //                 if (index === 0 || index === 1) {
-        //                     expect(reward.amount).to.equal(0);
-        //                     continue
-        //                 }
-        //                 expect(reward.amount).to.be.gt(0);
-        //             }
-        //         }
-        //     }
-        //     await deposit(end2endTestingAmount, wallet2, pendleGLPZapInData, pendleGDAIZapInData, oneInchSwapDataForGDAI, oneInchSwapDataForRETH, pendleRETHZapInData, oneInchSwapDataForMagic, pendlePendleZapInData);
-
-        //     for (const rToken of radiantRTokens) {
-        //         expect(await portfolioContract.rewardPerShareZappedIn(vaultName, rToken)).to.be.gt(0);
-        //         expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, rToken)).to.equal(0);
-        //     }
-        //     expect(await portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target)).to.equal(0);
-        //     expect(await portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target)).to.equal(0);
-        //     const rewardsOfWallet2 = await portfolioContract.getClaimableRewards(wallet2.address);
-        //     for (const [vaultIdx, claimableReward] of (await portfolioContract.getClaimableRewards(wallet.address)).entries()) {
-        //         if (claimableReward.protocol !== await vaultName) {
-        //             expect(claimableReward.claimableRewards).to.deep.equal([]);
-        //         } else {
-        //             expect(claimableReward.claimableRewards.length).to.equal(8);
-        //             for (const [index, reward] of claimableReward.claimableRewards.entries()) {
-        //                 if (index === 0 || index === 1) {
-        //                     expect(reward.amount).to.equal(0);
-        //                     continue
-        //                 }
-        //                 const vaultRewardOfWallet2 = rewardsOfWallet2[vaultIdx].claimableRewards[index].amount;
-        //                 expect(reward.amount).to.be.gt(vaultRewardOfWallet2);
-        //             }
-        //         }
-        //     }
-        // });
-
+        it("Reward Should be different, if they zap in different timeing", async function () {
+            this.timeout(2400000); // Set timeout to 120 seconds
+            expect(await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target)).to.equal(0);
+            expect(await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target)).to.equal(0);
+            expect(await contracts.portfolioContract.rewardPerShareZappedIn(vaultName, APX.target)).to.equal(0);
+            await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "", USDT.target, USDT.target);
+            await mineBlocks(1700); // wait for 7 hours, otherwise the reward/shares would be too small and be rounded to 0
+            const claimableRewards = await contracts.portfolioContract.getClaimableRewards(wallet.address);
+            for (claimableReward of claimableRewards) {
+                if (claimableReward.protocol !== await vaultName) {
+                    expect(claimableReward.claimableRewards).to.deep.equal([]);
+                } else {
+                    expect(claimableReward.claimableRewards.length).to.equal(1);
+                    for (const [index, reward] of claimableReward.claimableRewards.entries()) {
+                        expect(reward.amount).to.be.gt(0);
+                    }
+                }
+            }
+            await deposit(end2endTestingStableCointAmount, wallet2, contracts.portfolioContract, "", USDT.target, USDT.target);
+            expect(await contracts.portfolioContract.rewardPerShareZappedIn(vaultName, APX.target)).to.be.gt(0);
+            expect(await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, APX.target)).to.equal(0);
+            expect(await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target)).to.equal(0);
+            expect(await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target)).to.equal(0);
+            const rewardsOfWallet2 = await contracts.portfolioContract.getClaimableRewards(wallet2.address);
+            for (const [vaultIdx, claimableReward] of (await contracts.portfolioContract.getClaimableRewards(wallet.address)).entries()) {
+                if (claimableReward.protocol !== await vaultName) {
+                    expect(claimableReward.claimableRewards).to.deep.equal([]);
+                } else {
+                    expect(claimableReward.claimableRewards.length).to.equal(1);
+                    for (const [index, reward] of claimableReward.claimableRewards.entries()) {
+                        const vaultRewardOfWallet2 = rewardsOfWallet2[vaultIdx].claimableRewards[index].amount;
+                        expect(reward.amount).to.be.gt(vaultRewardOfWallet2);
+                    }
+                }
+            }
+        });
     });
 });

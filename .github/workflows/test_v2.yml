@@ -28,3 +28,5 @@ jobs:
             BLOCK_NUMBER=33285876 yarn test test/apolloX.js
             BLOCK_NUMBER=33285876 yarn test test/apolloX_claim.js
             BLOCK_NUMBER=33285876 yarn test test/upgradableProxyUUPS.js
+            BLOCK_NUMBER=33285876 yarn test test/upgradableProxyUUPS.js
+            BLOCK_NUMBER=33285876 yarn test test/updateReward_V2.js
