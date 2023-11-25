@@ -123,7 +123,12 @@ abstract contract AbstractVaultV2 is
   function redeem(
     uint256 shares,
     RedeemData calldata redeemData
-  ) public nonReentrant returns (uint256, address, address, bytes calldata) {
+  )
+    public
+    nonReentrant
+    whenNotPaused
+    returns (uint256, address, address, bytes calldata)
+  {
     // this part was directly copy from ERC4626.sol
     uint256 maxShares = maxRedeem(msg.sender);
     if (shares > maxShares) {

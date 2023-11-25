@@ -119,5 +119,11 @@ describe("All Weather Protocol", function () {
                 }
             }
         });
+        it("Portfolio Shares should be able to transfer and update the reward pointer correctly!", async function () {
+            this.timeout(2400000); // Set timeout to 120 seconds
+            await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "", USDT.target, USDT.target);
+            await mineBlocks(1700);
+            await contracts.portfolioContract.connect(wallet).transfer(wallet2.address, contracts.portfolioContract.balanceOf(wallet.address));
+        });
     });
 });

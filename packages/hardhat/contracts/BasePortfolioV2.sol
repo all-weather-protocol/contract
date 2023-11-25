@@ -91,6 +91,17 @@ abstract contract BasePortfolioV2 is
   // solhint-disable-next-line no-empty-blocks
   function _authorizeUpgrade(address) internal override onlyOwner {}
 
+  function _beforeTokenTransfer(
+    address from,
+    address to,
+    uint256 amount
+  ) internal virtual override updateRewards {
+    super._beforeTokenTransfer(from, to, amount);
+    if (to != msg.sender && from != address(0) && to != address(0)) {
+      _initReceiverRewardPointer(to);
+    }
+  }
+
   function updateOneInchAggregatorAddress(
     address oneInchAggregatorAddress_
   ) external onlyOwner {
@@ -305,6 +316,35 @@ abstract contract BasePortfolioV2 is
       });
     }
     return totalClaimableRewards;
+  }
+
+  function _initReceiverRewardPointer(address to) internal {
+    // since receipient won't trigger updateRewards(), we need to update the pointer for them
+    ClaimableRewardOfAProtocol[]
+      memory totalClaimableRewards = getClaimableRewards(
+        payable(address(this))
+      );
+    for (
+      uint256 vaultIdx = 0;
+      vaultIdx < totalClaimableRewards.length;
+      vaultIdx++
+    ) {
+      for (
+        uint256 rewardIdxOfThisVault = 0;
+        rewardIdxOfThisVault <
+        totalClaimableRewards[vaultIdx].claimableRewards.length;
+        rewardIdxOfThisVault++
+      ) {
+        address addressOfReward = totalClaimableRewards[vaultIdx]
+          .claimableRewards[rewardIdxOfThisVault]
+          .token;
+        string memory protocolNameOfThisVault = totalClaimableRewards[vaultIdx]
+          .protocol;
+        userRewardPerTokenPaidPointerMapping[to][protocolNameOfThisVault][
+          addressOfReward
+        ] = rewardPerShareZappedIn[protocolNameOfThisVault][addressOfReward];
+      }
+    }
   }
 
   function _getToken(
