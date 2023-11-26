@@ -156,11 +156,37 @@ abstract contract BasePortfolioV2 is
 
   function setVaultAllocations(
     PortfolioAllocationOfSingleCategory[] calldata portfolioAllocation_
-  ) public onlyOwner {
+  ) external onlyOwner {
     for (uint256 i = 0; i < portfolioAllocation_.length; i++) {
       portfolioAllocation[
         portfolioAllocation_[i].protocol
       ] = portfolioAllocation_[i].percentage;
+    }
+  }
+
+  function updateMappings(
+    string calldata mappingName,
+    address userAddress,
+    string calldata vaultName,
+    address rewardTokenAddress,
+    uint256 amount
+  ) external onlyOwner {
+    bytes32 mappingNameInBytes = keccak256(bytes(mappingName));
+    if (
+      mappingNameInBytes == keccak256(bytes("userRewardsOfInvestedProtocols"))
+    ) {
+      userRewardsOfInvestedProtocols[userAddress][vaultName][
+        rewardTokenAddress
+      ] = amount;
+    } else if (
+      mappingNameInBytes ==
+      keccak256(bytes("userRewardPerTokenPaidPointerMapping"))
+    ) {
+      userRewardPerTokenPaidPointerMapping[userAddress][vaultName][
+        rewardTokenAddress
+      ] = amount;
+    } else {
+      revert("Invalid mapping name");
     }
   }
 

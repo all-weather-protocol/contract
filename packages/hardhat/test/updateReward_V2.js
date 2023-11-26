@@ -123,7 +123,28 @@ describe("All Weather Protocol", function () {
             this.timeout(2400000); // Set timeout to 120 seconds
             await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "", USDT.target, USDT.target);
             await mineBlocks(1700);
+            const originalPointersOfThisPortfolioForRecordingDistributedRewards = await contracts.portfolioContract.pointersOfThisPortfolioForRecordingDistributedRewards(contracts.apolloxBscVault.target, APX.target);
+            expect(originalPointersOfThisPortfolioForRecordingDistributedRewards).to.equal(0);
+
             await contracts.portfolioContract.connect(wallet).transfer(wallet2.address, contracts.portfolioContract.balanceOf(wallet.address));
+            const wallet1Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target);
+            expect(wallet1Reward).to.be.gt(0);
+            const wallet2Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, APX.target);
+            expect(wallet2Reward).to.eq(0);
+
+            const wallet1Pointer = await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target);
+            const wallet2Pointer = await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target);
+            const rewardPerShareZappedIn = await contracts.portfolioContract.rewardPerShareZappedIn(vaultName, APX.target);
+            expect(wallet1Pointer).to.equal(wallet2Pointer);
+            expect(wallet1Pointer).to.equal(rewardPerShareZappedIn);
+            
+            const pointersOfThisPortfolioForRecordingDistributedRewards = await contracts.portfolioContract.pointersOfThisPortfolioForRecordingDistributedRewards(contracts.apolloxBscVault.target, APX.target);
+            expect(pointersOfThisPortfolioForRecordingDistributedRewards).to.be.gt(0);
+
+            const fakeReward = 10000000;
+            await contracts.portfolioContract.connect(wallet).updateMappings("userRewardsOfInvestedProtocols", wallet2.address, vaultName, APX.target, fakeReward);
+            const updatedWallet2Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, APX.target);
+            expect(updatedWallet2Reward).to.eq(fakeReward);
         });
     });
 });
