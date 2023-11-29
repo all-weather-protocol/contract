@@ -95,9 +95,17 @@ abstract contract BasePortfolioV2 is
     address from,
     address to,
     uint256 amount
-  ) internal virtual override updateRewards {
+  ) internal virtual override {
     super._beforeTokenTransfer(from, to, amount);
+    ClaimData memory claimData = ClaimData({
+      receiver: msg.sender,
+      apolloXClaimData: VaultClaimData({
+        tokenOut: address(0),
+        aggregatorData: new bytes(0)
+      })
+    });
     if (to != msg.sender && from != address(0) && to != address(0)) {
+      claim(claimData, false);
       _initReceiverRewardPointer(to);
     }
   }
@@ -263,9 +271,9 @@ abstract contract BasePortfolioV2 is
   }
 
   function claim(
-    ClaimData calldata claimData,
+    ClaimData memory claimData,
     bool useDump
-  ) external whenNotPaused updateRewards {
+  ) public whenNotPaused updateRewards {
     ClaimableRewardOfAProtocol[]
       memory totalClaimableRewards = getClaimableRewards(payable(msg.sender));
     uint256 userShares = balanceOf(msg.sender);
@@ -281,7 +289,7 @@ abstract contract BasePortfolioV2 is
       string memory protocolNameOfThisVault = totalClaimableRewards[vaultIdx]
         .protocol;
       bytes32 bytesOfvaultName = keccak256(bytes(protocolNameOfThisVault));
-      VaultClaimData calldata valutClaimData;
+      VaultClaimData memory valutClaimData;
       if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
         valutClaimData = claimData.apolloXClaimData;
       } else {
@@ -461,7 +469,7 @@ abstract contract BasePortfolioV2 is
     uint256 vaultIdx,
     ClaimableRewardOfAProtocol[] memory totalClaimableRewards,
     string memory protocolNameOfThisVault,
-    VaultClaimData calldata valutClaimData,
+    VaultClaimData memory valutClaimData,
     bool useDump,
     address receiver
   ) internal nonReentrant {
@@ -495,7 +503,7 @@ abstract contract BasePortfolioV2 is
 
   function _returnRewardsInPreferredToken(
     address addressOfReward,
-    VaultClaimData calldata valutClaimData,
+    VaultClaimData memory valutClaimData,
     string memory protocolNameOfThisVault,
     bool useDump,
     address receiver

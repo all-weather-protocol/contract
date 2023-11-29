@@ -5,10 +5,9 @@ const {
     deposit,
     getBeforeEachSetUp,
     radiantRTokens
-} = require("./utils"); let { currentTimestamp } = require("./utils");
+} = require("./utils");
 
 let wallet;
-let oneInchSwapDataForDpx;
 let oneInchSwapDataForGDAI;
 let pendleGDAIZapInData;
 let pendleGLPZapInData;

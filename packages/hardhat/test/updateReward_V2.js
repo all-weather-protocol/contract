@@ -106,18 +106,7 @@ describe("All Weather Protocol", function () {
             expect(await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, APX.target)).to.equal(0);
             expect(await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target)).to.equal(0);
             expect(await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target)).to.equal(0);
-            const rewardsOfWallet2 = await contracts.portfolioContract.getClaimableRewards(wallet2.address);
-            for (const [vaultIdx, claimableReward] of (await contracts.portfolioContract.getClaimableRewards(wallet.address)).entries()) {
-                if (claimableReward.protocol !== await vaultName) {
-                    expect(claimableReward.claimableRewards).to.deep.equal([]);
-                } else {
-                    expect(claimableReward.claimableRewards.length).to.equal(1);
-                    for (const [index, reward] of claimableReward.claimableRewards.entries()) {
-                        const vaultRewardOfWallet2 = rewardsOfWallet2[vaultIdx].claimableRewards[index].amount;
-                        expect(reward.amount).to.be.gt(vaultRewardOfWallet2);
-                    }
-                }
-            }
+            await checkClaimableRewards(wallet2.address, wallet.address);
         });
         it("Portfolio Shares should be able to transfer and update the reward pointer correctly!", async function () {
             this.timeout(2400000); // Set timeout to 120 seconds
@@ -125,10 +114,14 @@ describe("All Weather Protocol", function () {
             await mineBlocks(1700);
             const originalPointersOfThisPortfolioForRecordingDistributedRewards = await contracts.portfolioContract.pointersOfThisPortfolioForRecordingDistributedRewards(contracts.apolloxBscVault.target, APX.target);
             expect(originalPointersOfThisPortfolioForRecordingDistributedRewards).to.equal(0);
-
+            await checkClaimableRewards(wallet.address, wallet2.address, "transfer");
             await contracts.portfolioContract.connect(wallet).transfer(wallet2.address, contracts.portfolioContract.balanceOf(wallet.address));
+            await checkClaimableRewards(wallet.address, wallet2.address, "transfer");
+
             const wallet1Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target);
-            expect(wallet1Reward).to.be.gt(0);
+            expect(wallet1Reward).to.be.eq(0);
+            const wallet1RewardBalance = await APX.balanceOf(wallet.address);
+            expect(wallet1RewardBalance).to.be.gt(0);
             const wallet2Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, APX.target);
             expect(wallet2Reward).to.eq(0);
 
@@ -139,7 +132,7 @@ describe("All Weather Protocol", function () {
             expect(wallet1Pointer).to.equal(rewardPerShareZappedIn);
             
             const pointersOfThisPortfolioForRecordingDistributedRewards = await contracts.portfolioContract.pointersOfThisPortfolioForRecordingDistributedRewards(contracts.apolloxBscVault.target, APX.target);
-            expect(pointersOfThisPortfolioForRecordingDistributedRewards).to.be.gt(0);
+            expect(pointersOfThisPortfolioForRecordingDistributedRewards).to.eq(0);
 
             const fakeReward = 10000000;
             await contracts.portfolioContract.connect(wallet).updateMappings("userRewardsOfInvestedProtocols", wallet2.address, vaultName, APX.target, fakeReward);
@@ -148,3 +141,23 @@ describe("All Weather Protocol", function () {
         });
     });
 });
+
+async function checkClaimableRewards(address, address2, mode = "normal") {
+    const rewardsOfWallet = await contracts.portfolioContract.getClaimableRewards(address);
+    for (const [vaultIdx, claimableReward] of (await contracts.portfolioContract.getClaimableRewards(address2)).entries()) {
+        if (claimableReward.protocol !== await vaultName) {
+            expect(claimableReward.claimableRewards).to.deep.equal([]);
+        } else {
+            expect(claimableReward.claimableRewards.length).to.equal(1);
+            for (const [index, reward] of claimableReward.claimableRewards.entries()) {
+                const vaultRewardOfWallet = rewardsOfWallet[vaultIdx].claimableRewards[index].amount;
+                if (mode === "normal") {
+                    expect(reward.amount).to.be.gt(vaultRewardOfWallet);
+                } else {
+                    expect(reward.amount).to.equal(0);
+                }
+            }
+        }
+    }
+
+}
