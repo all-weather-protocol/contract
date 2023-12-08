@@ -11,6 +11,14 @@
 5. Update the contract addresses resides in `rebalance` server and `frontend`
 6. (optional): Might need to manually verify if your deploy script fails: `npx hardhat verify --network arbitrum 0x47cF63A2C2a60efD53193504c8a9846D38254549 "0x14FbC760eFaF36781cB0eb3Cb255aD976117B9Bd"  "Equilibria-RETH" "ALP-EQB-RETH"`
 
+## Upgrade Contracts:
+
+1. Upgrade Portfolio Contract:
+    1. change `API_URL` to the right network you want to deploy to in `packages/hardhat/.env`
+    2. Comment out the deployment part of `vault contract`, if you only want to upgrade `portfolio contract` (e.g. comment out `apolloxBscVault` in `deployContracts()`, [upgradeProxy.js](https://github.com/all-weather-protocol/contract/blob/master/packages/hardhat/deploy/upgradeProxy.js#L19C47-L19C47))
+    3. (optional): if you see this error, it means you're verifying the wrong contract. You should only verify the implementation contract since the proxy should remain the same. `message: 'execution reverted: ERC1967: new implementation is not a contract',`
+2. Upgrade Vault Contract: N/A, you need to create a new deploy script for this.
+
 ## Test
 
 * dpx: `BLOCK_NUMBER=97022421 yarn test test/dpxArbitrumVaultTest.js`

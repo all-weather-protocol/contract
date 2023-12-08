@@ -21,17 +21,17 @@ async function main() {
     // Verify the contract on Etherscan
     console.log("Verifying contract...");
     for (const contract of [portfolioContract]) {
-        // const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(contract.target);
-        // console.log("Proxy address: ", contract.target, "Implementation Address:", implementationAddress);
+        const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(contract.target);
+        console.log("Proxy address: ", contract.target, "Implementation Address:", implementationAddress);
         try {
-            await hre.run("verify:verify", {
-                address: contract.target,
-                constructorArguments: []
-            });
             // await hre.run("verify:verify", {
             //     address: contract.target,
             //     constructorArguments: []
             // });
+            await hre.run("verify:verify", {
+                address: implementationAddress,
+                constructorArguments: []
+            });
         } catch (error) {
             console.log(error);
         }
