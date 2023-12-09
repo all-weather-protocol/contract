@@ -298,6 +298,16 @@ module.exports = {
       chainId: 97,
       accounts: [`0x${PRIVATE_KEY}`]
     },
+    base: {
+      url: "https://base.llamarpc.com",
+      chainId: 8453,
+      accounts: [`0x${PRIVATE_KEY}`]
+    },
+    scroll: {
+      url: "https://rpc.ankr.com/scroll",
+      chainId: 534352,
+      accounts: [`0x${PRIVATE_KEY}`]
+    },
     neonlabs: {
       url: 'https://devnet.neonevm.org',
       accounts: [PRIVATE_KEY],
@@ -330,19 +340,19 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: '6QK3N5NY35YMWSIKZ9DPW6FGGXH3HIDRXC'
-    // apiKey: {
-    //   mainnet: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
-    //   goerli: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
-    //   kovan: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
-    //   rinkeby: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
-    //   ropsten: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
-    //   sepolia: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
-    //   arbitrumGoerli: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6',
-    //   arbitrum: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6',
-    //   bscTest: "6QK3N5NY35YMWSIKZ9DPW6FGGXH3HIDRXC"
-    //   // add other network's API key here
-    // },
+    apiKey: {
+      mainnet: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
+      goerli: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
+      kovan: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
+      rinkeby: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
+      ropsten: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
+      sepolia: "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW",
+      arbitrumGoerli: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6',
+      arbitrum: '5GAY3U1N3BGFJKGFXG6V3EEIUC84EAXYU6',
+      bscTest: "6QK3N5NY35YMWSIKZ9DPW6FGGXH3HIDRXC",
+      bsc: '6QK3N5NY35YMWSIKZ9DPW6FGGXH3HIDRXC'
+      // add other network's API key here
+    },
   },
   abiExporter: {
     path: "../react-app/src/contracts/ABI",
