@@ -32,6 +32,7 @@ abstract contract BasePortfolioV2 is
   struct PortfolioAllocationOfSingleCategory {
     string protocol;
     uint256 percentage;
+    address vaultAddress;
   }
   struct ClaimableRewardOfAProtocol {
     string protocol;
@@ -46,6 +47,7 @@ abstract contract BasePortfolioV2 is
   struct ClaimData {
     address receiver;
     VaultClaimData apolloXClaimData;
+    VaultClaimData velaBaseClaim;
   }
 
   struct VaultClaimData {
@@ -102,10 +104,14 @@ abstract contract BasePortfolioV2 is
       apolloXClaimData: VaultClaimData({
         tokenOut: address(0),
         aggregatorData: new bytes(0)
+      }),
+      velaBaseClaim: VaultClaimData({
+        tokenOut: address(0),
+        aggregatorData: new bytes(0)
       })
     });
     if (to != msg.sender && from != address(0) && to != address(0)) {
-      claim(claimData, false);
+      claim(claimData);
       _initReceiverRewardPointer(to);
     }
   }
@@ -165,10 +171,14 @@ abstract contract BasePortfolioV2 is
   function setVaultAllocations(
     PortfolioAllocationOfSingleCategory[] calldata portfolioAllocation_
   ) external onlyOwner {
+    // Clear the existing array to start fresh
+    delete vaults;
+
     for (uint256 i = 0; i < portfolioAllocation_.length; i++) {
       portfolioAllocation[
         portfolioAllocation_[i].protocol
       ] = portfolioAllocation_[i].percentage;
+      vaults.push(AbstractVaultV2(portfolioAllocation_[i].vaultAddress));
     }
   }
 
@@ -227,7 +237,6 @@ abstract contract BasePortfolioV2 is
     DepositData calldata depositData
   ) public updateRewards whenNotPaused nonReentrant {
     require(depositData.amount > 0, "amount must > 0");
-
     // Transfer tokens from the user to the contract
     (
       address addressOfTokenForDiversification,
@@ -271,8 +280,7 @@ abstract contract BasePortfolioV2 is
   }
 
   function claim(
-    ClaimData memory claimData,
-    bool useDump
+    ClaimData memory claimData
   ) public whenNotPaused updateRewards {
     ClaimableRewardOfAProtocol[]
       memory totalClaimableRewards = getClaimableRewards(payable(msg.sender));
@@ -292,6 +300,8 @@ abstract contract BasePortfolioV2 is
       VaultClaimData memory valutClaimData;
       if (bytesOfvaultName == keccak256(bytes("ApolloX-ALP"))) {
         valutClaimData = claimData.apolloXClaimData;
+      } else if (bytesOfvaultName == keccak256(bytes("Vela-VLP"))) {
+        valutClaimData = claimData.velaBaseClaim;
       } else {
         revert(
           string(abi.encodePacked("Unknow Vault:", protocolNameOfThisVault))
@@ -303,7 +313,6 @@ abstract contract BasePortfolioV2 is
         totalClaimableRewards,
         protocolNameOfThisVault,
         valutClaimData,
-        useDump,
         claimData.receiver
       );
     }
@@ -470,7 +479,6 @@ abstract contract BasePortfolioV2 is
     ClaimableRewardOfAProtocol[] memory totalClaimableRewards,
     string memory protocolNameOfThisVault,
     VaultClaimData memory valutClaimData,
-    bool useDump,
     address receiver
   ) internal nonReentrant {
     try vaults[vaultIdx].claim() {
@@ -487,7 +495,6 @@ abstract contract BasePortfolioV2 is
           addressOfReward,
           valutClaimData,
           protocolNameOfThisVault,
-          useDump,
           receiver
         );
         _resetUserRewardsOfInvestedProtocols(
@@ -505,11 +512,10 @@ abstract contract BasePortfolioV2 is
     address addressOfReward,
     VaultClaimData memory valutClaimData,
     string memory protocolNameOfThisVault,
-    bool useDump,
     address receiver
   ) internal {
     IERC20 rewardToken = IERC20(addressOfReward);
-    if (useDump == false) {
+    if (valutClaimData.aggregatorData.length == 0) {
       SafeERC20.safeTransfer(
         rewardToken,
         receiver,

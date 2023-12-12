@@ -55,6 +55,5 @@ describe("All Weather Protocol", function () {
       const currentApxBalance = await APX.balanceOf(wallet.address);
       expect(isWithinPercentage(currentApxBalance-originalApxBalance, 37811252255035n, 0.1)).to.be.true;
     })
-
   });
 });

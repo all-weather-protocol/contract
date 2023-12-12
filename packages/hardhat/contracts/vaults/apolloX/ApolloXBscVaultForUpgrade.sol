@@ -21,8 +21,6 @@ contract ApolloXBscVaultForUpgrade is AbstractVaultV2 {
   IERC20 public ALP;
   IERC20 public constant APX =
     IERC20(0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0);
-  uint256 public ratioAfterPerformanceFee;
-  uint256 public denominator;
 
   function initialize(
     IERC20MetadataUpgradeable asset_,
@@ -31,7 +29,13 @@ contract ApolloXBscVaultForUpgrade is AbstractVaultV2 {
     uint256 ratioAfterPerformanceFee_,
     uint256 denominator_
   ) public initializer {
-    AbstractVaultV2._initialize(asset_, name_, symbol_);
+    AbstractVaultV2._initialize(
+      asset_,
+      name_,
+      symbol_,
+      ratioAfterPerformanceFee_,
+      denominator_
+    );
 
     apolloX = IApolloX(0x1b6F2d3844C6ae7D56ceb3C3643b9060ba28FEb0);
     ALP = IERC20(0x4E47057f45adF24ba41375a175dA0357cB3480E5);
@@ -49,19 +53,6 @@ contract ApolloXBscVaultForUpgrade is AbstractVaultV2 {
     ALP = IERC20(newAddr);
   }
 
-  function updatePerformanceFeeMetaData(
-    uint256 ratioAfterPerformanceFee_,
-    uint256 denominator_
-  ) public onlyOwner {
-    require(denominator_ != 0, "denominator cannot be zero");
-    require(
-      ratioAfterPerformanceFee_ <= denominator_,
-      "ratioAfterPerformanceFee_ cannot be greater than denominator_"
-    );
-    ratioAfterPerformanceFee = ratioAfterPerformanceFee_;
-    denominator = denominator_;
-  }
-
   function totalLockedAssets() public pure override returns (uint256) {
     return 0;
   }
@@ -73,10 +64,6 @@ contract ApolloXBscVaultForUpgrade is AbstractVaultV2 {
     returns (uint256)
   {
     return apolloX.stakeOf(address(this));
-  }
-
-  function totalUnstakedAssets() public view override returns (uint256) {
-    return IERC20(asset()).balanceOf(address(this));
   }
 
   function claim() public override nonReentrant {
@@ -117,14 +104,6 @@ contract ApolloXBscVaultForUpgrade is AbstractVaultV2 {
     return rewards;
   }
 
-  function getPerformanceFeeRateMetaData()
-    public
-    view
-    returns (uint256, uint256)
-  {
-    return (ratioAfterPerformanceFee, denominator);
-  }
-
   function _zapIn(
     uint256 amount,
     DepositData calldata depositData
@@ -142,21 +121,6 @@ contract ApolloXBscVaultForUpgrade is AbstractVaultV2 {
     uint256 currentStakeOf = apolloX.stakeOf(address(this));
     uint256 mintedALPAmount = currentStakeOf - originalStakeOf;
     return mintedALPAmount;
-  }
-
-  function _calClaimableAmountAfterPerformanceFee(
-    uint256 claimableRewardsBelongsToThisPortfolio
-  ) internal view returns (uint256) {
-    (
-      uint256 ratioAfterPerformanceFee,
-      uint256 denominator
-    ) = getPerformanceFeeRateMetaData();
-    return
-      Math.mulDiv(
-        claimableRewardsBelongsToThisPortfolio,
-        ratioAfterPerformanceFee,
-        denominator
-      );
   }
 
   function _redeemFrom3rdPartyProtocol(

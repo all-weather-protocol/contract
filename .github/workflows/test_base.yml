@@ -1,0 +1,28 @@
+name: Test V2
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+    strategy:
+      matrix:
+        node-version: [16.x]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: yarn
+      - name: Test
+        run: |
+            export API_URL=https://base.llamarpc.com
+            BLOCK_NUMBER=7478004 yarn test test/base/velaBase.js

@@ -27,6 +27,8 @@ abstract contract AbstractVaultV2 is
   error ERC4626ExceededMaxRedeem(address owner, uint256 shares, uint256 max);
 
   address public oneInchAggregatorAddress;
+  uint256 public ratioAfterPerformanceFee;
+  uint256 public denominator;
 
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
@@ -36,7 +38,9 @@ abstract contract AbstractVaultV2 is
   function _initialize(
     IERC20MetadataUpgradeable asset_,
     string memory name_,
-    string memory symbol_
+    string memory symbol_,
+    uint256 ratioAfterPerformanceFee_,
+    uint256 denominator_
   ) public onlyInitializing {
     ERC4626Upgradeable.__ERC4626_init(asset_);
     ERC20Upgradeable.__ERC20_init(name_, symbol_);
@@ -44,6 +48,9 @@ abstract contract AbstractVaultV2 is
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
     UUPSUpgradeable.__UUPSUpgradeable_init();
     PausableUpgradeable.__Pausable_init();
+
+    ratioAfterPerformanceFee = ratioAfterPerformanceFee_;
+    denominator = denominator_;
   }
 
   // solhint-disable-next-line no-empty-blocks
@@ -64,13 +71,51 @@ abstract contract AbstractVaultV2 is
     virtual
     returns (uint256);
 
-  function totalUnstakedAssets() public view virtual returns (uint256);
+  function totalUnstakedAssets() public view returns (uint256) {
+    return IERC20(asset()).balanceOf(address(this));
+  }
 
   function totalAssets() public view override returns (uint256) {
     return
       totalLockedAssets() +
       totalStakedButWithoutLockedAssets() +
       totalUnstakedAssets();
+  }
+
+  function updatePerformanceFeeMetaData(
+    uint256 ratioAfterPerformanceFee_,
+    uint256 denominator_
+  ) public onlyOwner {
+    require(denominator_ != 0, "denominator cannot be zero");
+    require(
+      ratioAfterPerformanceFee_ <= denominator_,
+      "ratioAfterPerformanceFee_ cannot be greater than denominator_"
+    );
+    ratioAfterPerformanceFee = ratioAfterPerformanceFee_;
+    denominator = denominator_;
+  }
+
+  function getPerformanceFeeRateMetaData()
+    public
+    view
+    returns (uint256, uint256)
+  {
+    return (ratioAfterPerformanceFee, denominator);
+  }
+
+  function _calClaimableAmountAfterPerformanceFee(
+    uint256 claimableRewardsBelongsToThisPortfolio
+  ) internal view returns (uint256) {
+    (
+      uint256 ratioAfterPerformanceFee,
+      uint256 denominator
+    ) = getPerformanceFeeRateMetaData();
+    return
+      Math.mulDiv(
+        claimableRewardsBelongsToThisPortfolio,
+        ratioAfterPerformanceFee,
+        denominator
+      );
   }
 
   function getClaimableRewards()
