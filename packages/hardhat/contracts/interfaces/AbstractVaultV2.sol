@@ -87,10 +87,7 @@ abstract contract AbstractVaultV2 is
     uint256 denominator_
   ) public onlyOwner {
     require(denominator_ != 0, "denominator cannot be zero");
-    require(
-      ratioAfterPerformanceFee_ <= denominator_,
-      "ratioAfterPerformanceFee_ cannot be greater than denominator_"
-    );
+    require(ratioAfterPerformanceFee_ <= denominator_, "fee > denominator");
     ratioAfterPerformanceFee = ratioAfterPerformanceFee_;
     denominator = denominator_;
   }
