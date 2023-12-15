@@ -25,21 +25,19 @@ describe("All Weather Protocol", function () {
             wallet,
             wallet2,
             deployer
-        } = await getBeforeEachSetUp([
-            { protocol: "ApolloX-ALP", percentage: 100 }
-        ]));
+        } = await getBeforeEachSetUp());
         ({ ApolloX, USDC, USDT, APX } = await initTokens());
         vaultName = contracts.apolloxBscVault.name();
     });
 
     describe("ApolloX Contract Test", function () {
         it("userRewardsOfInvestedProtocols should be reset to 0 after claim()", async function () {
-            await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "apollox-claim-alp-reward-deposit");
+            await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "", USDT.target, USDT.target);
             
             const rewardPerShareZappedIn1 = await contracts.portfolioContract.rewardPerShareZappedIn(vaultName, APX.target);
             expect(rewardPerShareZappedIn1).to.equal(0);
             await mineBlocks(2000); // wait for 7 hours, otherwise the reward/shares would be too small and be rounded to 0
-            await deposit(end2endTestingStableCointAmount, wallet2, contracts.portfolioContract, "apollox-claim-alp-reward-deposit");
+            await deposit(end2endTestingStableCointAmount, wallet2, contracts.portfolioContract, "", USDT.target, USDT.target);
             const rewardPerShareZappedIn2 = await contracts.portfolioContract.rewardPerShareZappedIn(vaultName, APX.target);
             expect(rewardPerShareZappedIn2).to.be.gt(rewardPerShareZappedIn1);
 
@@ -76,7 +74,12 @@ describe("All Weather Protocol", function () {
                   minOut: ethers.parseEther("9"),
                   tokenOut: USDC.target,
                   aggregatorData: ethers.toUtf8Bytes('')
-                }
+                },
+                velaRedeemData: {
+                    vlpTokenOut: USDC.target,
+                    tokenOut: USDC.target,
+                    aggregatorData: ethers.toUtf8Bytes('')
+                  }  
               }, { gasLimit });        
             expect(await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target)).to.equal(0);
             expect(await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target)).to.equal(await contracts.portfolioContract.rewardPerShareZappedIn(vaultName, APX.target));
@@ -135,7 +138,7 @@ describe("All Weather Protocol", function () {
             expect(pointersOfThisPortfolioForRecordingDistributedRewards).to.eq(0);
 
             const fakeReward = 10000000;
-            await contracts.portfolioContract.connect(wallet).updateMappings("userRewardsOfInvestedProtocols", wallet2.address, vaultName, APX.target, fakeReward);
+            await contracts.portfolioContract.updateMappings("userRewardsOfInvestedProtocols", wallet2.address, vaultName, APX.target, fakeReward, {signer: wallet});
             const updatedWallet2Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, APX.target);
             expect(updatedWallet2Reward).to.eq(fakeReward);
         });
