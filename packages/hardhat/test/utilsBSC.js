@@ -28,12 +28,12 @@ async function initTokens() {
         USDT
     }
 }
-async function getBeforeEachSetUp(allocations) {
+async function getBeforeEachSetUp() {
   const wallet = await ethers.getImpersonatedSigner(myImpersonatedWalletAddress);
   const wallet2 = await ethers.getImpersonatedSigner(myImpersonatedWalletAddress2);
   const deployer = wallet;
     
-  const contracts = await deployContracts(allocations, deployer, wallet2);
+  const contracts = await deployContracts(deployer, wallet2);
   // send BNB to portfolioContract for gas fee
   await (await deployer.sendTransaction({ to: contracts.portfolioContract.target, value: ethers.parseEther("1"), gasLimit:30000000 })).wait();
   return {
@@ -45,7 +45,7 @@ async function getBeforeEachSetUp(allocations) {
 }
 
 
-async function deployContracts(allocations, deployer, wallet2) {
+async function deployContracts(deployer, wallet2) {
   const { ALP, USDC, USDT } = await initTokens();
 
   const apolloxBsc = await ethers.getContractFactory("ApolloXBscVault");
@@ -57,21 +57,29 @@ async function deployContracts(allocations, deployer, wallet2) {
   await apolloxBscVault.connect(deployer).updatePerformanceFeeMetaData(8, 10, {gasLimit:30000000});
 
   const StableCoinVaultFactory = await ethers.getContractFactory("StableCoinVault");
-  const portfolioContract = await upgrades.deployProxy(await StableCoinVaultFactory.connect(deployer), ["StableCoinLP", "SCLP", apolloxBscVault.target], {gasLimit:30000000, kind: 'uups'});
+  const portfolioContract = await upgrades.deployProxy(
+    StableCoinVaultFactory,
+    ["StableCoinLP", "SCLP"],
+    { initializer: 'initialize', gasLimit: 30000000, kind: 'uups', signer: deployer }
+  );
+
   await portfolioContract.waitForDeployment();
 
-  await portfolioContract.connect(deployer).setVaultAllocations(allocations, {gasLimit:30000000}).then((tx) => tx.wait());
-  await portfolioContract.connect(deployer).updateOneInchAggregatorAddress(oneInchBscAddress).then((tx) => tx.wait());
+  const allocations = [
+      { protocol: "ApolloX-ALP", percentage: 100, vaultAddress: apolloxBscVault.target}
+  ];
+  await portfolioContract.setVaultAllocations(allocations, {signer: deployer}).then((tx) => tx.wait());
+  await portfolioContract.updateOneInchAggregatorAddress(oneInchBscAddress, {signer: deployer}).then((tx) => tx.wait());
   await _checkAllcation(allocations, portfolioContract);
 
   // some token chores and initilization top up
-  for (const wallet of [deployer, wallet2]) {    
+  for (const wallet of [deployer, wallet2]) {
     await (await USDC.connect(wallet).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
     await (await USDT.connect(wallet).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
     await (await ALP.connect(wallet).approve(portfolioContract.target, ethers.MaxUint256, { gasLimit:30000000 })).wait();
   }
   return {
-    portfolioContract, 
+    portfolioContract,
     apolloxBscVault};
 }
 
@@ -93,15 +101,19 @@ async function deposit(end2endTestingStableCointAmount, wallet, portfolioContrac
     // at the time of writing, the price of ALP is 1.1175, so assume the price is 1.2, including fee, as minALP
     minALP: ethers.parseEther("1")/ BigInt(12) * BigInt(10)
   }
+  const velaDepositData = {
+    tokenIn: USDT.target,
+    crossChainCallData: ethers.toUtf8Bytes('')    
+  }
 
-  console.log("wallet", wallet.address)
   const depositData = {
     amount: end2endTestingStableCointAmount,
     receiver: wallet.address,
     tokenIn: tokenInAddress,
     tokenInAfterSwap: tokenOutAddress,
-    aggregatorData: fixtureName !== '' ? _getAggregatorData(fixtureName, 56, USDC.target, USDT.target, end2endTestingStableCointAmount, portfolioContract.target, fixtureName): ethers.toUtf8Bytes(''),
-    apolloXDepositData
+    aggregatorData: fixtureName !== '' ? await _getAggregatorData(fixtureName, 56, USDC.target, USDT.target, end2endTestingStableCointAmount, portfolioContract.target, fixtureName): ethers.toUtf8Bytes(''),
+    apolloXDepositData,
+    velaDepositData
   }
   return await (await portfolioContract.connect(wallet).deposit(depositData, { gasLimit: 30000000 })).wait();
 }
@@ -113,10 +125,13 @@ async function claim(walletAddress, deployer, amount, portfolioContract, fixture
     apolloXClaimData: {
       tokenOut: USDC.target,
       aggregatorData: _getAggregatorData(fixtureName, 56, APX.target, USDC.target, amount, portfolioContract.target),
+    },
+    velaBaseClaim: {
+      tokenOut: USDC.target,
+      aggregatorData: ethers.toUtf8Bytes('')
     }
   }
-  const useDump = true;
-  return await (await portfolioContract.connect(deployer).claim(claimData, useDump, { gasLimit: 30000000 })).wait();
+  return await (await portfolioContract.connect(deployer).claim(claimData, { gasLimit: 30000000 })).wait();
 }
 
 // radiant has an one year lock, therefore need these timestamp-related variables

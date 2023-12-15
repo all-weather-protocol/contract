@@ -11,9 +11,7 @@ describe("All Weather Protocol", function () {
   beforeEach(async () => {
     ({
       deployer
-    } = await getBeforeEachSetUp([
-        {protocol: "ApolloX-ALP", percentage: 100}
-      ]));
+    } = await getBeforeEachSetUp());
     ({ApolloX, USDC, APX, ALP} = await initTokens());
   });
 

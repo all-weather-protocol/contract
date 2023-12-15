@@ -2,7 +2,7 @@ name: Echidna Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -30,7 +30,7 @@ jobs:
     - name: Run Echidna
       uses: crytic/echidna-action@v2
       with:
-        solc-version: 0.8.18
+        solc-version: 0.8.20
         files: packages/hardhat/contracts/
         contract: PermanentPortfolioLPToken
         crytic-args: --hardhat-ignore-compile

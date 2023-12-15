@@ -17,6 +17,7 @@ let wallet;
 let contracts;
 let ApolloX;
 let USDC;
+let USDT;
 describe("All Weather Protocol", function () {
   beforeEach(async () => {
     ({
@@ -24,10 +25,8 @@ describe("All Weather Protocol", function () {
       wallet,
       wallet2,
       deployer
-    } = await getBeforeEachSetUp([
-        {protocol: "ApolloX-ALP", percentage: 100}
-      ]));
-    ({ApolloX, USDC, APX} = await initTokens());
+    } = await getBeforeEachSetUp());
+    ({ApolloX, USDC, APX, USDT} = await initTokens());
   });
 
   describe("ApolloX Contract Test", function () {
@@ -50,7 +49,7 @@ describe("All Weather Protocol", function () {
     );
     it("Should be able to burn ALP and redeem to USDC", async function () {
       this.timeout(240000); // Set timeout to 120 seconds
-      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "apollox-redeem-alp");
+      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "", USDT.target, USDT.target);
       await simulateTimeElasped(86400*2); // there's a 1-day constraint for redeeming ALP
 
       const shares = contracts.portfolioContract.balanceOf(wallet.address);
@@ -63,6 +62,11 @@ describe("All Weather Protocol", function () {
           minOut: ethers.parseEther("9"),
           tokenOut: USDC.target,
           aggregatorData: ethers.toUtf8Bytes('')
+        },
+        velaRedeemData: {
+          vlpTokenOut: USDC.target,
+          tokenOut: USDC.target,
+          aggregatorData: ethers.toUtf8Bytes('')
         }
       }, { gasLimit });
       const currentTokenOutBalance = await USDC.balanceOf(wallet.address);
@@ -73,7 +77,7 @@ describe("All Weather Protocol", function () {
       for (const protocol of claimableRewards) {
         expect(protocol.claimableRewards).to.deep.equal([]);
       }
-      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "apollox-check-alp-reward");
+      await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "", USDT.target, USDT.target);
       await mineBlocks(100);
       const newClaimableRewards = await contracts.portfolioContract.getClaimableRewards(wallet.address);
       expect(isWithinPercentage(newClaimableRewards[0].claimableRewards[0].amount, 149747573175198n, 0.1)).to.be.true;
