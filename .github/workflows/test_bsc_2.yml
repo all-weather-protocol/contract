@@ -1,8 +1,4 @@
-<<<<<<< Updated upstream
-name: Test V2
-=======
 name: Test BSC V2
->>>>>>> Stashed changes
 
 on:
   push:
