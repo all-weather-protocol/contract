@@ -114,19 +114,25 @@ describe("All Weather Protocol", function () {
         it("Portfolio Shares should be able to transfer and update the reward pointer correctly!", async function () {
             this.timeout(2400000); // Set timeout to 120 seconds
             await deposit(end2endTestingStableCointAmount, wallet, contracts.portfolioContract, "", USDT.target, USDT.target);
-            await mineBlocks(1700);
             const originalPointersOfThisPortfolioForRecordingDistributedRewards = await contracts.portfolioContract.pointersOfThisPortfolioForRecordingDistributedRewards(contracts.apolloxBscVault.target, APX.target);
             expect(originalPointersOfThisPortfolioForRecordingDistributedRewards).to.equal(0);
             await checkClaimableRewards(wallet.address, wallet2.address, "transfer");
+            await deposit(end2endTestingStableCointAmount, wallet2, contracts.portfolioContract, "", USDT.target, USDT.target);
+            await mineBlocks(1700);
+            const wallet2RewardBeforeTransfer = (await contracts.portfolioContract.getClaimableRewards(wallet2.address))[0].claimableRewards[0].amount;
+            // after transfer SLP from wallet1 to wallet2, the reward of wallet2 should be updated and be greater than before
             await contracts.portfolioContract.connect(wallet).transfer(wallet2.address, contracts.portfolioContract.balanceOf(wallet.address));
-            await checkClaimableRewards(wallet.address, wallet2.address, "transfer");
+            const wallet2Rewards = (await contracts.portfolioContract.getClaimableRewards(wallet2.address))[0].claimableRewards[0].amount;
+            expect(wallet2Rewards).to.be.gt(
+                wallet2RewardBeforeTransfer
+                );
 
             const wallet1Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet.address, vaultName, APX.target);
             expect(wallet1Reward).to.be.eq(0);
             const wallet1RewardBalance = await APX.balanceOf(wallet.address);
             expect(wallet1RewardBalance).to.be.gt(0);
             const wallet2Reward = await contracts.portfolioContract.userRewardsOfInvestedProtocols(wallet2.address, vaultName, APX.target);
-            expect(wallet2Reward).to.eq(0);
+            expect(wallet2Reward).to.gt(wallet2RewardBeforeTransfer);
 
             const wallet1Pointer = await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target);
             const wallet2Pointer = await contracts.portfolioContract.userRewardPerTokenPaidPointerMapping(wallet.address, vaultName, APX.target);

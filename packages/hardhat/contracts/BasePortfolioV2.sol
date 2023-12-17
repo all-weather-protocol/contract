@@ -158,10 +158,15 @@ abstract contract BasePortfolioV2 is
         ][addressOfReward] = totalClaimableRewards[vaultIdx]
           .claimableRewards[rewardIdxOfThisVault]
           .amount;
+        rewardPerShareZappedIn[totalClaimableRewards[vaultIdx].protocol][
+          addressOfReward
+        ] += _calculateRewardPerShareDuringThisPeriod(
+          oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
+        );
         _updateUserSpecificReward(
           totalClaimableRewards[vaultIdx].protocol,
           addressOfReward,
-          oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
+          msg.sender
         );
       }
     }
@@ -378,14 +383,13 @@ abstract contract BasePortfolioV2 is
         totalClaimableRewards[vaultIdx].claimableRewards.length;
         rewardIdxOfThisVault++
       ) {
-        address addressOfReward = totalClaimableRewards[vaultIdx]
-          .claimableRewards[rewardIdxOfThisVault]
-          .token;
-        string memory protocolNameOfThisVault = totalClaimableRewards[vaultIdx]
-          .protocol;
-        userRewardPerTokenPaidPointerMapping[to][protocolNameOfThisVault][
-          addressOfReward
-        ] = rewardPerShareZappedIn[protocolNameOfThisVault][addressOfReward];
+        _updateUserSpecificReward(
+          totalClaimableRewards[vaultIdx].protocol,
+          totalClaimableRewards[vaultIdx]
+            .claimableRewards[rewardIdxOfThisVault]
+            .token,
+          to
+        );
       }
     }
   }
@@ -619,21 +623,17 @@ abstract contract BasePortfolioV2 is
   function _updateUserSpecificReward(
     string memory protocolNameOfThisVault,
     address addressOfReward,
-    uint256 oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
+    address account
   ) internal {
-    if (msg.sender != address(0)) {
-      rewardPerShareZappedIn[protocolNameOfThisVault][
-        addressOfReward
-      ] += _calculateRewardPerShareDuringThisPeriod(
-        oneOfTheUnclaimedRewardsAmountBelongsToThisPortfolio
-      );
-      userRewardsOfInvestedProtocols[msg.sender][protocolNameOfThisVault][
+    if (account != address(0)) {
+      userRewardsOfInvestedProtocols[account][protocolNameOfThisVault][
         addressOfReward
       ] += _calcualteUserEarnedBeforeThisUpdateAction(
         protocolNameOfThisVault,
-        addressOfReward
+        addressOfReward,
+        account
       );
-      userRewardPerTokenPaidPointerMapping[msg.sender][protocolNameOfThisVault][
+      userRewardPerTokenPaidPointerMapping[account][protocolNameOfThisVault][
         addressOfReward
       ] = rewardPerShareZappedIn[protocolNameOfThisVault][addressOfReward];
     }
@@ -641,13 +641,14 @@ abstract contract BasePortfolioV2 is
 
   function _calcualteUserEarnedBeforeThisUpdateAction(
     string memory protocolNameOfThisVault,
-    address addressOfReward
+    address addressOfReward,
+    address account
   ) internal view returns (uint256) {
     return
       (rewardPerShareZappedIn[protocolNameOfThisVault][addressOfReward] -
-        userRewardPerTokenPaidPointerMapping[msg.sender][
-          protocolNameOfThisVault
-        ][addressOfReward]) * balanceOf(msg.sender);
+        userRewardPerTokenPaidPointerMapping[account][protocolNameOfThisVault][
+          addressOfReward
+        ]) * balanceOf(account);
   }
 
   function _calculateRewardPerShareDuringThisPeriod(
