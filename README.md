@@ -16,7 +16,8 @@
 1. Upgrade Portfolio Contract:
     1. change `API_URL` to the right network you want to deploy to in `packages/hardhat/.env`
     2. Comment out the deployment part of `vault contract`, if you only want to upgrade `portfolio contract` (e.g. comment out `apolloxBscVault` in `deployContracts()`, [upgradeProxy.js](https://github.com/all-weather-protocol/contract/blob/master/packages/hardhat/deploy/upgradeProxy.js#L19C47-L19C47))
-    3. (optional): if you see this error, it means you're verifying the wrong contract. You should only verify the implementation contract since the proxy should remain the same. `message: 'execution reverted: ERC1967: new implementation is not a contract',`
+    3. command: ` npx hardhat run --network <network> deploy/upgradeProxy.js`
+    4. (optional): if you see this error, it means you're verifying the wrong contract. You should only verify the implementation contract since the proxy should remain the same. `message: 'execution reverted: ERC1967: new implementation is not a contract',`
 2. Upgrade Vault Contract: N/A, you need to create a new deploy script for this.
 
 ## Test
