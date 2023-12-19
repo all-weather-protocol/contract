@@ -16,18 +16,22 @@ async function main() {
     const allocations = [
         { protocol: "ApolloX-ALP", percentage: 100 }
     ];
-    const { portfolioContract } = await deployContracts(allocations, deployer, wallet2);
+    const { apolloxBscVault } = await deployContracts(allocations, deployer, wallet2);
 
     // Verify the contract on Etherscan
     console.log("Verifying contract...");
-    for (const contract of [portfolioContract]) {
+    for (const contract of [apolloxBscVault]) {
         const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(contract.target);
         console.log("Proxy address: ", contract.target, "Implementation Address:", implementationAddress);
         try {
-            // await hre.run("verify:verify", {
-            //     address: contract.target,
-            //     constructorArguments: []
-            // });
+            await hre.run("verify:verify", {
+                address: contract.target,
+                constructorArguments: []
+            });
+        } catch (error) {
+            console.log(error);
+        }
+        try {
             await hre.run("verify:verify", {
                 address: implementationAddress,
                 constructorArguments: []

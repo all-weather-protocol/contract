@@ -6,10 +6,10 @@
 2. Deploy:
     1. change `API_URL` to the right network you want to deploy to in `packages/hardhat/.env`
     2. `npx hardhat run --network <network> deploy/deployPermanentPortfolio.js`
-3. For fronend development: `export TESTNET_API_URL=http://127.0.0.1:8545/; npx hardhat run --network localhost deploy/deployPermanentPortfolio.js`
-4. Chain: `export BLOCK_NUMBER=123270171; yarn chain`
-5. Update the contract addresses resides in `rebalance` server and `frontend`
-6. (optional): Might need to manually verify if your deploy script fails: `npx hardhat verify --network arbitrum 0x47cF63A2C2a60efD53193504c8a9846D38254549 "0x14FbC760eFaF36781cB0eb3Cb255aD976117B9Bd"  "Equilibria-RETH" "ALP-EQB-RETH"`
+3. (optional): Might need to manually verify if your deploy script fails, especially for vaults not portfolio contract:
+    1. `npx hardhat verify --network arbitrum 0x47cF63A2C2a60efD53193504c8a9846D38254549 "0x14FbC760eFaF36781cB0eb3Cb255aD976117B9Bd"  "Equilibria-RETH" "ALP-EQB-RETH"`
+    2. `npx hardhat verify --network bsc 0x51766aeF369c60e8Af732454b3a10cA068589438`
+3. Update the contract addresses resides in `rebalance` server and `frontend`
 
 ## Upgrade Contracts:
 
